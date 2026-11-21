@@ -1,0 +1,455 @@
+           Product Review Rating Prediction:
+     Progress Report on Data Preparation, Baselines,
+              and Ordinal Learning Design
+                               Efe Han Keleş, Mehmet Ege Aşan, and Faris Aleem Ahmad
+                                                  CS 415 Project Progress Report
+                                                       November 16, 2026
+
+
+   Abstract—Predicting a product review’s one-to-ﬁve-star rating     (CE), ordinal log-loss (OLL), and multitask log loss (MLL).
+from its text requires both recognizing sentiment and accounting     We retain this scope. The present progress consists of literature
+for the order of the labels. An error of one star is less severe     synthesis, an explicit evaluation protocol, a reproducible full-
+than an error of four stars, although ordinary exact-match
+evaluation treats both as incorrect. This project investigates       corpus audit, and measured linear baselines. We do not yet
+whether ordinal training objectives reduce rating distance and       claim that the main research hypothesis has been conﬁrmed.
+large errors while preserving macro-F1. This report reviews
+relevant literature, speciﬁes a controlled TextCNN/DistilBERT             II. R ELATED S TUDIES AND T HEIR I MPLICATIONS
+comparison, and presents completed data preparation and pre-         A. Rating Prediction and Strong Text Baselines
+liminary experiments. A full audit of 568,454 Amazon Fine
+Foods reviews produced 393,001 usable, unique normalized texts          Pang and Lee [1], in ACL, studied rating inference beyond
+after removing repeated and conﬂicting records. Product-disjoint     binary positive/negative sentiment. Their metric-labeling for-
+training, validation, and test partitions were constructed and       mulation incorporates relationships among ratings and sim-
+checked for exact text overlap. On 56,791 validation reviews, an     ilarities among reviews. The important connection to our
+unweighted TF–IDF linear baseline achieved 73.28% accuracy
+and 0.455 mean absolute error, averaged over three seeds. A          project is that rating prediction is not simply an unordered
+class-balanced variant achieved 0.538 macro-F1, compared with        multiclass problem. Their method modiﬁes classiﬁer output
+0.454 for the unweighted model. These are preliminary baseline       through label relationships; our planned comparison instead
+results; TextCNN, DistilBERT, and the ordinal-loss comparison        changes the training objective while retaining a common ﬁve-
+remain future work. The reserved test set has not been used for      output classiﬁer.
+prediction evaluation.
+   Index Terms—rating prediction, ordinal classiﬁcation, senti-
+                                                                        Wang and Manning [2], in ACL, showed that feature choices
+ment analysis, TextCNN, DistilBERT                                   and baseline variants can substantially change sentiment-
+                                                                     classiﬁcation performance. In particular, word bigrams and a
+               I. P ROBLEM AND M OTIVATION                           combination of Naive Bayes features with SVMs were effec-
+                                                                     tive. This motivates measuring inexpensive lexical baselines
+   Online reviews contain detailed customer experiences, while       before interpreting gains from neural models. Our TF–IDF
+star ratings compress those experiences into a small ordered         logistic baseline follows this experimental principle; it is not
+scale. Our task is to infer a rating y ∈ {1, 2, 3, 4, 5} using the   a reproduction of their NB–SVM algorithm. Bigrams can
+review body x alone. This can support feedback summariza-            represent short expressions such as “not good,” but cannot
+tion or estimate the likely rating of an unrated written review.     fully model sentence composition or distant context.
+A prediction is an estimate of the expressed opinion, not a
+replacement for a customer’s actual rating.                          B. Neural Text Representations
+   Several properties make the task difﬁcult. Reviews may               Kim [3], in EMNLP, evaluated a convolutional sentence
+praise one aspect and criticize another; negation and long-          classiﬁer using pretrained word vectors, convolutional ﬁlters,
+distance context can reverse a sentiment cue. Different cus-         and max-over-time pooling. Static embeddings already per-
+tomers may attach different ratings to similar wording. The          formed strongly, while task-speciﬁc embedding updates could
+class frequencies are also unequal. A model that mostly pre-         provide further gains. TextCNN offers a relatively inexpen-
+dicts ﬁve stars can appear accurate while failing on dissatisﬁed     sive model of local word patterns and a useful reference
+customers and intermediate ratings. Finally, the labels are          architecture for this project. However, its pooling operation
+ordered: predicting ﬁve stars for a one-star review is more          compresses sequence information, and a ﬁxed embedding
+serious than predicting two stars.                                   represents a word identically across contexts. These limitations
+   The central research question is: Within a ﬁxed model             motivate comparison with a contextual encoder rather than
+architecture, can an ordinal loss reduce mean absolute error         assuming a CNN is sufﬁcient for every review.
+and the frequency of errors of at least two stars without               Pennington et al. [4], in EMNLP, introduced GloVe, which
+materially reducing macro-F1? The original proposal speciﬁes         learns word representations from global co-occurrence statis-
+TextCNN and DistilBERT, each trained with cross-entropy              tics. We plan to use its pretrained vectors as the frozen
+embedding layer in TextCNN. This keeps the proposal’s static-      nominal and distance-sensitive metrics together. A reduction
+embedding design and reduces the number of parameters that         in mean error should not conceal poor recognition of minority
+must be learned from the rating dataset. GloVe differs from        classes, and improved macro-F1 should not conceal larger
+the word-vector source used by Kim; our implementation             rating mistakes.
+will therefore be described as an adaptation of TextCNN,              Castagnos et al. [11], in COLING, proposed OLL, which
+not an exact reproduction. Vocabulary coverage must still be       penalizes probability assigned to incorrect classes using their
+measured on the training split.                                    distance from the true class. Its distance exponent controls
+   Devlin et al. [5], in NAACL, introduced BERT’s bidi-            how strongly distant alternatives are penalized. The method
+rectional pretraining and task-speciﬁc ﬁne-tuning. Contextual      is attractive here because it changes the objective without
+representations provide a principled way to model interactions     requiring a new encoder or label decomposition. The article
+beyond local word windows. Sanh et al. [6] compressed              evaluates multiple text benchmarks, but this does not establish
+this approach through knowledge distillation in DistilBERT.        that the method will satisfy our macro-F1 constraint under
+Their reported speed and size beneﬁts motivate a smaller           product-disjoint Fine Foods evaluation.
+Transformer under a course-project compute budget; they are           Kasa et al. [12], in Findings of ACL, compared explicit
+not measurements on our hardware. DistilBERT is cited as an        ordinal objectives and approaches that exploit label semantics.
+arXiv preprint, separately from the peer-reviewed conference       They introduced MLL as a weighted combination of CE and
+and journal papers. Our experiment will test whether the effect    OLL to address the trade-off between nominal and ordinal per-
+of a loss function transfers from ﬁxed-vector convolution to       formance. We adopt that published formulation and restrict the
+pretrained contextual representations.                             scope to the three speciﬁed losses. Their broader comparison
+   Dang et al. [7], in Sensors, combined BERT representations      motivates checking several metrics and treating the mixture
+with CNN/LSTM classiﬁers and integrated sentiment informa-         weight as a validation hyperparameter. We do not assume that
+tion into a recommender system. Their ﬁve-level sentiment          an ordinal objective guarantees either a unimodal predictive
+classiﬁcation on Amazon Fine Food Reviews is especially            distribution or an empirical improvement on this dataset.
+relevant because it uses the same underlying review col-
+                                                                   D. Generalization and the Experimental Gap
+lection. Nevertheless, their recommendation component, fea-
+ture pipeline, and evaluation setup differ from our text-only,        Blitzer et al. [13], in ACL, studied sentiment adaptation
+product-disjoint task. Consequently, their scores cannot serve     across Amazon product domains. Their binary classiﬁcation
+as directly comparable baselines for our experiment. Their         setting differs from ﬁve-star prediction, but it shows why
+study supports the dataset’s applicability and the usefulness      domain-dependent vocabulary matters. Product-disjoint split-
+of learned representations, while our focus is a controlled        ting within Fine Foods addresses unseen products within a
+comparison of training losses.                                     category; it does not establish generalization to a different
+                                                                   category, platform, or time period. Cross-category evaluation
+C. Ordinal Methods and Evaluation                                  remains optional, after the main experiment is complete.
+   Gutiérrez et al. [8], in IEEE Transactions on Knowledge            Taken together, the literature motivates our representations,
+and Data Engineering, provide a taxonomy and experimental          ordinal objectives, and evaluation measures. Our contribution
+study of ordinal regression. Their discussion covers approaches    is a reproducible comparison of existing methods under a
+that use ordering through model structure, decomposed binary       common data protocol, not a new loss function. Table I
+problems, or thresholds. This establishes that there are several   summarizes the resulting design choices.
+valid ways to incorporate order. Our choice of loss-based
+                                                                          III. ACTIVITIES : T HEORETICAL D ESIGN AND
+methods is primarily experimental: CE, OLL, and MLL can
+                                                                                        J USTIFICATION
+use the same ﬁve-class output layer, making architecture
+changes an avoidable confound.                                     A. Input Deﬁnition and Data Protocol
+   Cao et al. [9], in Pattern Recognition Letters, introduced         The model input is the review body. The star rating is
+CORAL to maintain rank consistency across binary ordinal           the target; product IDs are used only to construct partitions.
+subtasks. A ﬁve-level target can be represented through four       User IDs, helpfulness votes, summaries, and other metadata
+ordered threshold decisions. This is an important alternative      are excluded from the predictors. This makes the experiment
+to a softmax classiﬁer, but its output formulation differs from    a direct test of information in the review body and avoids
+the proposed loss-only comparison. We retain CORAL as              incorporating metadata unavailable for an unrated review.
+a possible extension after the main six conﬁgurations. Its            The implemented normalization decodes HTML entities,
+published experiments concern age estimation; transfer of its      removes HTML tags, collapses repeated whitespace, and low-
+beneﬁts to review text requires evidence.                          ercases the text. It does not stem words or remove stopwords,
+   Chen et al. [10], in the Eval4NLP workshop, compared            so negation words remain available. Reviews with missing text,
+multiclass and ordinal formulations using the same underlying      missing product IDs, or ratings outside 1–5 are rejected. We
+architecture. Their results illustrate that the preferred model    group records by normalized body text, remove all records in
+can change when evaluation considers error magnitude rather        a group if its labels disagree, and retain the ﬁrst source record
+than accuracy or F1 alone. This directly motivates reporting       in each remaining repeated-text group. This is a deterministic
+                                                            TABLE I
+  H OW THE REVIEWED LITERATURE INFORMS THE PROJECT. P UBLISHED RESULTS ARE NOT TREATED AS DIRECTLY COMPARABLE PROJECT SCORES .
+
+Study and venue                   Main methodological contribution                   Consequence for this project
+Pang–Lee, ACL 2005                Rating-scale relationships and metric labeling     Treat ratings as ordered labels; retain distance-sensitive evaluation.
+Wang–Manning, ACL 2012            Strong lexical models and word bigrams             Establish a measured lexical reference before neural comparisons.
+Kim; Pennington et al., EMNLP     Convolutional classiﬁcation; pretrained            Use local-pattern convolution with frozen pretrained embeddings.
+2014                              GloVe vectors
+Devlin et al., NAACL 2019; Sanh   Contextual pretraining; model distillation         Compare a ﬁne-tuned DistilBERT encoder with TextCNN.
+et al., preprint
+Dang et al., Sensors 2021         Hybrid sentiment/recommendation on Fine            Supports domain relevance; differing protocols prevent score
+                                  Foods                                              equivalence.
+Gutiérrez et al., IEEE TKDE       Ordinal taxonomy; rank-consistent thresholds       Recognize alternatives, but hold the output structure ﬁxed in the
+2016; Cao et al., PRL 2020                                                           main study.
+Chen et al., Eval4NLP 2021        Error-sensitive assessment of ordered labels       Jointly report accuracy, macro-F1, MAE, and large error rate.
+Castagnos et al., COLING 2022;    OLL; CE/OLL mixture and comparative                Compare CE, OLL, and MLL with matched model and data settings.
+Kasa et al., Findings ACL 2024    analysis
+Blitzer et al., ACL 2007          Cross-domain sentiment adaptation                  Separate within-category product generalization from optional
+                                                                                     domain transfer.
+
+
+
+corpus-curation rule, ﬁxed before model ﬁtting. It deﬁnes                                                   TABLE II
+a deduplicated task and is not a method for resolving the                        C OMPUTED LOSS ILLUSTRATION , NOT A TRAINED EXPERIMENT. T RUE
+                                                                                                RATING IS 1, α = 1, AND λ = 0.5.
+ambiguity of conﬂicting reviews.
+   We then assign each retained product ID to train, validation,                          Probability mass pattern            CE      OLL        MLL
+or test using a salted SHA-256 hash with probability intervals
+                                                                                          Near-error vector                2.303      1.904     2.103
+[0, 0.70), [0.70, 0.85), and [0.85, 1). This assigns all retained                         Far-error vector                 2.303      6.652     4.477
+reviews of a product to the same partition without using the                Near: (.10, .80, .04, .03, .03). Far: (.10, .03, .03, .04, .80). Entries follow star order
+rating. Review-level proportions need not be exactly 70/15/15               1–5.
+because products have unequal numbers of reviews. The salt
+and row-level assignment are saved. Vocabulary and inverse
+document frequencies are ﬁtted on training text only. Test                  C. Loss Functions and Decision Rule
+labels are used for ﬁxed curation and descriptive counts, but                  Let pk = softmax(z)k be the predicted probability of star
+no test predictions or model-selection scores are computed.                 class k. We use integer star distance d(y, k) = |y − k|.
+                                                                            This treats successive star steps as equally costly, an explicit
+B. Architecture Decisions                                                   operational assumption rather than a claim about equal psy-
+   TextCNN (speciﬁed; not yet trained). The starting conﬁg-                 chological distances.
+uration uses 100-dimensional frozen GloVe embeddings, con-
+volution widths 3, 4, and 5, 100 ﬁlters per width, ReLU, max-                          LCE (p, y) = − log py ,                                                   (1)
+                                                                                                      ∑
+over-time pooling, dropout 0.5, and a ﬁve-output linear layer.                        LOLL (p, y) = −     |y − k|α log(1 − pk ),                                 (2)
+These are provisional implementation settings, not selected                                                   k̸=y
+experimental winners. The training vocabulary will be capped                          LMLL (p, y) = λLCE (p, y) + (1 − λ)LOLL (p, y).                            (3)
+at 50,000 tokens, with explicit padding and unknown-token
+handling. A 256-token input limit is the initial memory-budget              Equation (2) follows Castagnos et al. [11]; Eq. (3) follows
+choice; truncation and embedding coverage will be measured                  Kasa et al. [12]. We retain unnormalized distances, record
+before freezing it.                                                         α and λ, and do not silently divide the ordinal term by the
+   DistilBERT (speciﬁed; not yet trained). We plan to ﬁne-                  number of classes. Changing its scale changes the effective
+tune distilbert-base-uncased with its tokenizer and                         mixture. Stable log-probability operations will be used in
+a ﬁve-output classiﬁcation head, updating both encoder and                  the trainable implementation, with numerical checks near the
+head. The starting maximum length is 256 subword tokens and                 simplex boundaries.
+the batch size is 16, subject to a memory pilot. Word counts                   CE rewards the correct class probability, whereas OLL
+are not interchangeable with Transformer token counts. Any                  also distinguishes where incorrect probability is placed. MLL
+revision to sequence length or batch size will be ﬁxed across               preserves direct supervision of the correct class while applying
+all losses within this architecture before the comparative runs.            an ordinal penalty. A computed illustration in Table II holds
+   These architectures provide complementary inductive bi-                  py ﬁxed and moves mass from a nearby class to a distant
+ases: local pattern extraction with frozen vectors and contex-              one. This veriﬁes the intended numerical behavior; it is not
+tual representation learning through ﬁne-tuning. Their absolute             evidence of trained-model accuracy.
+scores also depend on pretraining and capacity. We therefore                   All principal comparisons will use ŷ = arg maxk pk . The
+interpret a loss effect primarily within an architecture, rather            same rule prevents a change in decoding from being mistaken
+than attributing all cross-architecture differences to ordinality.          for a change in training loss. Posterior-median decoding,
+which is relevant to absolute-error minimization when proba-                                         TABLE III
+bilities are reliable, can be a separately labeled ablation. It will                    P ROGRESS AS OF N OVEMBER 16, 2026.
+not replace argmax in selected rows of the main comparison.
+                                                                       Activity                                                Status
+D. Controlled Comparison and Success Criteria                          Literature synthesis and method justiﬁcation            Completed
+                                                                       Full Fine Foods audit and deterministic cleaning        Completed
+   The core design contains 2×3 = 6 architecture/loss settings.        Product-disjoint split and exact-overlap checks         Completed
+Each ﬁnal setting will be run with seeds 17, 29, and 43 on             TF–IDF baselines, two variants, three seeds each        Completed
+the same data assignment. Within an architecture, paired runs          Numerical CE/OLL/MLL illustration                       Completed
+                                                                       TextCNN and DistilBERT architecture speciﬁcation        Designed
+will use the same initial encoder/head state and data order            Neural training and comparative loss experiments        Pending
+where technically possible. We will ﬁx preprocessing, batch            Final test evaluation and optional domain transfer      Pending
+size, optimizer family, maximum epochs, and checkpoint-
+selection rules within each architecture, then allow a compara-                                     TABLE IV
+ble validation-search budget per loss. Loss magnitude affects                M EASURED DATA - CURATION COUNTS ON THE FULL ARCHIVE .
+optimization, so forcing a single learning rate without a pilot
+could itself introduce an unfair comparison.                                        Item                                     Count
+   The proposed search has six candidate conﬁgurations per                          Raw reviews                             568,454
+loss per architecture. CE varies learning rate and weight decay;                    Raw products                             74,258
+                                                                                    Invalid or missing-ﬁeld rows                  0
+OLL varies learning rate and α ∈ {1, 2}; MLL initially ﬁxes                         Conﬂicting normalized-text groups           119
+α = 1 and varies learning rate and λ ∈ {0.25, 0.5, 0.75}. The                       Rows in conﬂicting groups removed           428
+exact learning-rate values will be frozen after a training-only                     Same-label duplicate rows removed       175,025
+                                                                                    Retained reviews                        393,001
+stability pilot. This restricted MLL search does not explore all                    Retained products                        67,485
+combinations of exponent and mixture weight. Search runs use
+seed 17; the chosen conﬁguration is then evaluated across all
+three seeds. Checkpoints are selected by validation MAE, with          those checks veriﬁed basic structure but were not representa-
+higher macro-F1 breaking ties, under a common maximum-                 tive performance experiments. The present work extends this
+epoch and patience policy within each architecture.                    to the complete primary corpus, reproducible partitioning, and
+   For N predictions, we compute                                       six trained linear-baseline runs. Table III explicitly separates
+                         1 ∑
+                             N                                         completed work from planned work.
+               MAE =           |ŷi − yi |,                     (4)
+                         N i=1
+                                                                       B. Full-Corpus Audit
+                         1  ∑
+                            N
+                                                                          The downloaded SNAP archive [14] contains 568,454
+                LER =          1{|ŷi − yi | ≥ 2}.              (5)
+                         N i=1                                         records and 74,258 distinct product IDs, matching the pub-
+                                                                       lished counts. Its checksum and source URL are saved in
+Accuracy measures exact matches and macro-F1 averages the              the experiment artifacts. All records passed the implemented
+ﬁve classwise F1 values with equal weight. LER is also one             checks for nonempty normalized text, valid ratings, and prod-
+minus off-by-one accuracy. We will report all four metrics,            uct IDs. This is not a certiﬁcation of language, authenticity,
+per-class results, confusion matrices, and measured time on            or semantic agreement between text and rating.
+the same hardware.                                                        The audit found 119 normalized-text groups with inconsis-
+   The proposal’s success criterion remains unchanged: relative        tent ratings, containing 428 records. Removing these groups
+to CE within an architecture, at least one ordinal method              and then 175,025 redundant same-label records leaves 393,001
+must reduce MAE by at least 3% and LER by at least 5%,                 reviews and 67,485 retained products. The 175,453 removed
+while its macro-F1 decrease is no more than 0.01 on the 0–1            rows represent 30.86% of the raw collection. Global exact-text
+scale. These are joint requirements on the three-seed mean test        deduplication prevents identical retained texts from appearing
+results, not already achieved outcomes. When ﬁnal evaluation           across partitions. However, keeping only the ﬁrst occurrence
+is performed, paired product-level bootstrap intervals will            changes the product and review distribution; this is a deliberate
+complement seed standard deviations; reviews from the same             deﬁnition of the cleaned evaluation corpus. Near duplicates,
+product must not be treated as independent bootstrap units.            spelling variants, and product aliases remain potential leakage
+Trying two ordinal losses across two architectures also requires       channels.
+caution when interpreting a single favorable conﬁguration.
+                                                                          Five-star reviews constitute 63.72% of the cleaned corpus,
+       IV. ACTIVITIES : E XPERIMENTS AND R ESULTS                      while two-star reviews constitute 5.28%. Figure 2 shows
+                                                                       that the training and validation distributions remain strongly
+A. Completed Work and Evidence                                         skewed. This explains why accuracy alone would be mislead-
+   The original proposal selected the task, candidate datasets,        ing. The median normalized review length is 56 whitespace-
+architectures, and success thresholds. Earlier local checks            delimited words; the 95th percentile is 213, and 3.02% ex-
+inspected non-random preﬁxes of several candidate datasets;            ceed 256 words. These values justify measuring truncation
+                                                                                                                       TF-IDF baselines
+                           568,454 raw             Normalize + deduplicate        Product-hash split
+                                                                                                                  Validation: 56,791 reviews
+                        Fine Foods reviews            393,001 retained           70 / 15 / 15 targets
+                                                                                                                     2 variants x 3 seeds
+
+
+
+
+                                                                                 TextCNN / DistilBERT
+                                                                                                                  Freeze selected settings
+                       Solid: completed                                             CE / OLL / MLL
+                                                                                                                   3 seeds; then final test
+                       Dashed: planned                                            Matched validation
+                                                                                                                  59,366 reserved reviews
+                                                                                        search
+
+
+
+
+Fig. 1. Current workﬂow and the planned main experiment. Solid boxes show completed processing and baseline evaluation. Dashed boxes show the neural
+comparison and ﬁnal test evaluation that remain to be performed.
+
+
+
+                           TABLE V                                                   have different identiﬁers.
+R ETAINED REVIEW COUNTS BY STAR RATING AND PARTITION . T EST DATA
+         ARE RESERVED FOR FINAL PREDICTION EVALUATION .                              C. Baseline Setup
+                                                                                        We evaluated a majority-class predictor and two lexical
+                                Stars          Train   Validation     Test
+                                                                                     classiﬁers. The majority predictor chooses the most frequent
+                                1             25,369       5,343     5,482           training rating, which is ﬁve stars. Both learned variants use
+                                2             14,672       3,034     3,056
+                                3             21,339       4,173     4,193           identical TF–IDF unigram and bigram features, a training-only
+                                4             39,927       8,084     7,920           vocabulary of at most 60,000 features, minimum document
+                                5            175,537      36,157    38,715           frequency 3, sublinear term frequency, and L2 normalization.
+                                Total        276,844      56,791    59,366
+                                Products      47,394       9,892    10,199           The tokenizer retains word tokens of at least two characters.
+                                                                                     Thus negation words are retained, although punctuation and
+                                                                                     some contractions are simpliﬁed by tokenization. This feature
+                                                                                     policy is a baseline choice, not the ﬁnal neural tokenization.
+                                     Train                                              The classiﬁer is scikit-learn’s SGDClassifier with bi-
+                                     Validation
+
+
+
+
+Share of reviews (%)
+                       60                                                            nary logistic loss in a one-versus-rest multiclass formulation,
+                                                                                     L2 penalty 10−5 , at most 30 epochs, tolerance 10−4 , and
+                                                                                     default optimal learning-rate schedule. It is not the ﬁve-
+                       40                                                            way softmax CE model speciﬁed for the neural comparison.
+                                                                                     The unweighted variant uses uniform sample importance. The
+                                                                                     balanced variant uses training-derived class weights n/(5nc )
+                       20                                                            to increase the contribution of less frequent ratings. We do not
+                                                                                     equate class weighting with an ordinal loss.
+                                                                                        Both variants were trained with seeds 17, 29, and 43.
+                        0                                                            Hyperparameters were ﬁxed for this preliminary experiment;
+                                 1            2         3            4       5       no grid search selected the reported rows. We evaluate on
+                                                   Star rating                       validation only and use the same partition for every seed and
+                                                                                     variant. Training runs used one CPU thread on an Apple M3
+Fig. 2. Measured class frequencies in the cleaned training and validation            Pro system, with Python 3.12.14 and scikit-learn 1.9.1. Feature
+splits. Counts and preprocessing come from the full-corpus audit.
+                                                                                     construction and validation transformation together took 20.8
+                                                                                     seconds. The reported ﬁt time excludes feature extraction and
+                                                                                     prediction; timing is a local measurement, not a benchmark of
+explicitly rather than assuming that a 256-token neural input
+                                                                                     neural-model efﬁciency.
+preserves all relevant content.
+   The partitions contain 276,844 training, 56,791 validation,                       D. Measured Validation Performance
+and 59,366 reserved test reviews. Assertions over every pair                           Table VI reports means and sample standard deviations
+of splits veriﬁed zero shared retained product IDs and zero                          across the three optimization seeds. The majority predictor
+shared normalized-text hashes. This establishes the intended                         obtains 63.67% accuracy while macro-F1 is only 0.156. Its
+exact-overlap constraints, not general independence: users can                       apparent accuracy mainly reﬂects label imbalance and gives a
+still recur and semantically equivalent product variants may                         necessary lower reference for interpreting the learned models.
+                                                               TABLE VI
+    VALIDATION PERFORMANCE : MEAN ± SAMPLE STANDARD DEVIATION OVER SEEDS 17, 29, AND 43. ACCURACY AND LER ARE PERCENTAGES ;
+              MACRO -F1 USES THE 0–1 SCALE ; MAE IS IN STARS . T HE DETERMINISTIC MAJORITY BASELINE IS EVALUATED ONCE .
+
+
+                  Model                 Accuracy ↑       Macro-F1 ↑            MAE ↓           LER ↓        Fit time (s)
+                  Majority                 63.67           0.1556              0.8259           22.10            –
+                  TF–IDF, unweighted   73.28 ± 0.02   0.4538 ± 0.0012     0.4550 ± 0.0009   10.35 ± 0.03    8.75 ± 0.72
+                  TF–IDF, balanced     73.54 ± 0.01   0.5376 ± 0.0004     0.3956 ± 0.0004   7.75 ± 0.03    10.75 ± 0.29
+
+
+
+   The unweighted lexical classiﬁer improves accuracy to                does not establish user-disjoint, chronological, or cross-domain
+73.28%, macro-F1 to 0.4538, and MAE to 0.4550. The bal-                 generalization.
+anced variant reaches 73.54% accuracy and 0.5376 macro-
+F1, with MAE 0.3956 and LER 7.75%. Compared with                        F. Reproducibility Artifacts
+the unweighted model, balancing reduces MAE by 13.05%                      The accompanying folder contains the downloaded archive,
+and LER by 25.10% relative, while increasing macro-F1 by                its SHA-256 digest, the retained-row split manifest, experi-
+0.0839. All four aggregate metrics improve in this pilot; the           ment conﬁguration, per-seed validation predictions, confusion
+remaining trade-offs occur at the classwise precision/recall            matrices, classwise metrics, and scripts that regenerate the
+level. These gains concern class weighting in a linear model,           tables and ﬁgures. The manifest records original row in-
+so they do not satisfy or test the proposal’s CE-versus-ordinal-        dex, product ID, normalized-text hash, rating, partition, and
+loss success criterion. All six ﬁts terminated before the 30-           word count. All report numbers are generated from saved
+epoch cap without convergence warnings: 25 epochs for each              JSON/CSV outputs. The LaTeX source uses the IEEEtran
+unweighted run and 26 for each balanced run.                            conference class and an IEEE bibliography style. A separate
+   The seed variability measures sensitivity to training order          Turkish README explains how to rebuild the report and rerun
+on a ﬁxed dataset. It is not an estimate of uncertainty over new        the experiments.
+products or alternative train/test splits. The current results jus-
+tify further model development and expose different classwise                    V. N EXT S TEPS AND C OMPLETION P LAN
+behavior, but do not test whether OLL or MLL outperforms
+CE.                                                                        The next stage is to audit language eligibility, near du-
+                                                                        plicates, GloVe coverage, and tokenizer-speciﬁc truncation.
+E. Error Analysis and Limits of the Evidence                            These checks will determine whether the present corpus
+   Figure 3 separates improvement on common labels from                 deﬁnition can be frozen for the neural study. Next, we will
+recognition of intermediate ratings. For seed 17, two-star              implement TextCNN and DistilBERT training, verify loss
+recall increases from 8.24% to 32.33%, while its precision              gradients and numerical stability, and run a small training-only
+decreases from 52.08% to 35.35%. Five-star recall decreases             memory and optimization pilot. After ﬁxing per-architecture
+from 97.61% to 89.82%, but ﬁve-star precision increases                 budgets, the six validation conﬁgurations per loss will be
+from 76.97% to 86.20%. Class balancing therefore shifts the             evaluated, followed by three-seed runs of each selected setting.
+decision boundary toward less frequent ratings rather than                 Only after conﬁguration selection and checkpoint rules
+improving every precision and recall simultaneously. Middle             are ﬁxed will the reserved test partition be evaluated. The
+ratings can reﬂect mixed sentiment and subjective boundaries.           ﬁnal comparison will include paired differences from CE,
+A confusion matrix can identify where mistakes concentrate,             the three proposal thresholds, classwise errors, product-level
+but does not by itself establish their linguistic cause. Manual         uncertainty estimates, and training time. We will preserve
+inspection will therefore categorize errors involving negation,         negative or mixed ﬁndings rather than select only a favorable
+mixed aspects, short reviews, and long reviews, using a ﬁxed            metric. Optional All Beauty or another category evaluation is
+validation sampling rule.                                               lower priority than completing the six main settings and their
+   Several limitations remain. First, these are validation re-          replication.
+sults from lexical baselines, not ﬁnal neural or test results.             The responsibilities in Table VII follow the proposal and
+Second, removing contradictory texts makes the retained task            can be shared when needed. The main priority is completing
+less ambiguous and limits comparability with studies using              the within-architecture loss comparison. Domain transfer and
+the raw corpus. Third, exact normalization does not resolve             alternative ordinal heads will be attempted only if they do not
+near duplication. Fourth, automated language identiﬁcation has          delay that work. The group will reserve time before the course
+not been applied; the current corpus is not claimed to be               deadline for checking the ﬁnal PDF, validating the reported
+veriﬁed English-only data. The English pretrained encoders              numbers, and preparing a single group submission.
+require a language audit before their input set is frozen.
+                                                                                              VI. C ONCLUSION
+If that audit changes eligibility, a versioned split manifest
+and rerun baselines will be required, with the original test               The project now has a justiﬁed experimental design, a re-
+results still unexamined. Finally, product-disjoint evaluation          viewed theoretical basis, and a reproducible empirical starting
+                                        Unweighted                                                          Class-balanced
+
+                           1   64.3    2.4   3.2    1.5    28.6                                  1   72.1   13.0   5.3    1.2    8.4
+
+
+                           2   29.4    8.2   16.6   7.4    38.3                                  2   28.7   32.3   23.4   5.4    10.1
+
+
+
+
+             True rating                                                           True rating
+                           3   9.7     2.2   24.0   18.8   45.3                                  3   10.9   15.0   41.9   16.4   15.7
+
+
+                           4   1.8     0.1   3.9    20.1   74.0                                  4   2.8    2.7    14.1   33.5   46.9
+
+
+                           5   0.5     0.0   0.2    1.6    97.6                                  5   1.8    0.7    2.0    5.8    89.8
+
+
+                                1      2      3       4     5                                         1     2      3       4      5
+                                       Predicted rating                                                     Predicted rating
+
+Fig. 3. Row-normalized validation confusion matrices for the prespeciﬁed seed 17. Left: unweighted TF–IDF classiﬁer. Right: class-balanced TF–IDF classiﬁer.
+Each row corresponds to a true star rating and sums to 100% before rounding. These are illustrative runs; the main table averages three seeds.
+
+
+
+                              TABLE VII                                         [3] Y. Kim, “Convolutional neural networks for sentence classiﬁcation,”
+    O RDERED MILESTONES AND PROPOSED RESPONSIBILITIES . T HESE ARE                  in Proc. EMNLP, 2014, pp. 1746–1751. [Online]. Available: https:
+     FUTURE DELIVERABLES , NOT COMPLETED ACTIVITIES OR CALENDAR                     //aclanthology.org/D14-1181/
+                              PROMISES .                                        [4] J. Pennington, R. Socher, and C. Manning, “GloVe: Global vectors for
+                                                                                    word representation,” in Proc. EMNLP, 2014, pp. 1532–1543. [Online].
+Step      Deliverable and exit condition                   Lead                     Available: https://aclanthology.org/D14-1162/
+                                                                                [5] J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova, “BERT: Pre-
+1         Language, duplicate, and tokenization audit;     Efe Han Keleş           training of deep bidirectional transformers for language understanding,”
+          freeze data version                                                       in Proc. NAACL-HLT, 2019, pp. 4171–4186. [Online]. Available:
+2         Both neural models and stable losses; pilot      Mehmet Ege               https://aclanthology.org/N19-1423/
+          logs recorded                                    Aşan                [6] V. Sanh, L. Debut, J. Chaumond, and T. Wolf, “DistilBERT, a
+3         Matched validation searches and all              Mehmet Ege               distilled version of BERT: Smaller, faster, cheaper and lighter,”
+          three-seed runs                                  Aşan                    arXiv:1910.01108, 2019. [Online]. Available: https://arxiv.org/abs/1910.
+4         Reserved-test metrics, uncertainty, and error    Faris Aleem              01108
+          analysis                                         Ahmad                [7] C. N. Dang, M. N. Moreno-García, and F. De la Prieta, “An approach
+5         Final tables, limitations, and checked IEEE      All members              to integrating sentiment analysis into recommender systems,” Sensors,
+          PDF                                                                       vol. 21, no. 16, p. 5666, 2021.
+                                                                                [8] P. A. Gutiérrez, M. Pérez-Ortiz, J. Sánchez-Monedero, F. Fernández-
+                                                                                    Navarro, and C. Hervás-Martínez, “Ordinal regression methods: Survey
+                                                                                    and experimental study,” IEEE Transactions on Knowledge and Data
+point. The full Fine Foods audit revealed substantial dupli-                        Engineering, vol. 28, no. 1, pp. 127–146, 2016.
+                                                                                [9] W. Cao, V. Mirjalili, and S. Raschka, “Rank consistent ordinal regres-
+cation and produced 393,001 retained reviews with product-                          sion for neural networks with application to age estimation,” Pattern
+disjoint partitions. Six linear training runs demonstrated that                     Recognition Letters, vol. 140, pp. 325–331, 2020.
+review text provides useful predictive information beyond the                  [10] D. Chen, M. Courtland, A. Faulkner, and A. Ezen-Can, “Error-sensitive
+                                                                                    evaluation for ordinal target variables,” in Proc. Eval4NLP, 2021, pp.
+ﬁve-star majority baseline and that class balancing improves                        189–199. [Online]. Available: https://aclanthology.org/2021.eval4nlp-1.
+aggregate performance while changing classwise precision and                        19/
+recall. These ﬁndings make a joint nominal/ordinal assessment                  [11] F. Castagnos, M. Mihelich, and C. Dognin, “A simple log-based loss
+                                                                                    function for ordinal text classiﬁcation,” in Proc. COLING, 2022, pp.
+necessary. TextCNN, DistilBERT, and CE/OLL/MLL compar-                              4604–4609. [Online]. Available: https://aclanthology.org/2022.coling-1.
+ative training have not yet been performed, so the ordinal-                         407/
+learning hypothesis remains open. Completing that controlled                   [12] S. R. Kasa, A. Goel, K. Gupta, S. Roychowdhury, A. Bhanushali,
+                                                                                    N. Pattisapu, and P. Srinivasa Murthy, “Exploring ordinality in text
+experiment and evaluating it once on the reserved test set are                      classiﬁcation: A comparative study of explicit and implicit techniques,”
+the next central deliverables.                                                      in Findings of ACL, 2024, pp. 5390–5404. [Online]. Available:
+                                                                                    https://aclanthology.org/2024.ﬁndings-acl.320/
+                                                                               [13] J. Blitzer, M. Dredze, and F. Pereira, “Biographies, Bollywood, boom-
+                                      R EFERENCES                                   boxes and blenders: Domain adaptation for sentiment classiﬁcation,”
+                                                                                    in Proc. ACL, 2007, pp. 440–447. [Online]. Available: https:
+ [1] B. Pang and L. Lee, “Seeing stars: Exploiting class relationships              //aclanthology.org/P07-1056/
+     for sentiment categorization with respect to rating scales,” in Proc.     [14] Stanford Network Analysis Project, “Amazon Fine Foods reviews,”
+     ACL, 2005, pp. 115–124. [Online]. Available: https://aclanthology.org/         dataset; accessed Nov. 16, 2026. [Online]. Available: https://snap.
+     P05-1015/                                                                      stanford.edu/data/web-FineFoods.html
+ [2] S. Wang and C. Manning, “Baselines and bigrams: Simple, good
+     sentiment and topic classiﬁcation,” in Proc. ACL, 2012, pp. 90–94.
+     [Online]. Available: https://aclanthology.org/P12-2018/
+

@@ -1,0 +1,43 @@
+{
+  "sampling": "First 1000 complete records in a bounded file prefix, not random or representative.",
+  "datasets": {
+    "Fine Foods": {
+      "source": "https://snap.stanford.edu/data/finefoods.txt.gz",
+      "downloaded_bytes": 1048576,
+      "sample_size": 1000,
+      "blank_texts": 0,
+      "invalid_ratings": 0,
+      "rating_counts": {
+        "5.0": 642,
+        "1.0": 98,
+        "4.0": 138,
+        "2.0": 47,
+        "3.0": 75
+      },
+      "repeated_normalized_text_rows": 3,
+      "texts_under_3_words": 0,
+      "missing_product_ids": 0,
+      "distinct_products": 207,
+      "scope_limit": "Checks schema and basic cleanliness only; does not verify language, authenticity or rating correctness."
+    },
+    "All Beauty": {
+      "source": "https://mcauleylab.ucsd.edu/public_datasets/data/amazon_2023/raw/review_categories/All_Beauty.jsonl.gz",
+      "downloaded_bytes": 1048576,
+      "sample_size": 1000,
+      "blank_texts": 0,
+      "invalid_ratings": 0,
+      "rating_counts": {
+        "5.0": 574,
+        "4.0": 189,
+        "1.0": 63,
+        "3.0": 111,
+        "2.0": 63
+      },
+      "repeated_normalized_text_rows": 12,
+      "texts_under_3_words": 27,
+      "missing_product_ids": 0,
+      "distinct_products": 921,
+      "scope_limit": "Checks schema and basic cleanliness only; does not verify language, authenticity or rating correctness."
+    }
+  }
+}

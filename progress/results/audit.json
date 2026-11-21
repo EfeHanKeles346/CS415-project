@@ -1,0 +1,76 @@
+{
+  "source_url": "https://snap.stanford.edu/data/finefoods.txt.gz",
+  "source_sha256": "03bbbe147814be08a945501ef867795a8ad535385341e71f0d56a0c7d9daf1b4",
+  "compressed_bytes": 122104202,
+  "raw_rows": 568454,
+  "raw_products": 74258,
+  "raw_rating_counts": {
+    "1.0": 52268,
+    "2.0": 29769,
+    "3.0": 42640,
+    "4.0": 80655,
+    "5.0": 363122
+  },
+  "empty_texts": 0,
+  "invalid_ratings": 0,
+  "missing_product_ids": 0,
+  "invalid_rows": 0,
+  "normalization": "HTML unescape, strip tags, whitespace collapse, lowercase; no stemming or stopword removal.",
+  "conflicting_text_groups": 119,
+  "conflicting_rows_removed": 428,
+  "repeated_text_rows_before_conflict_removal": 175334,
+  "same_label_duplicate_rows_removed": 175025,
+  "clean_rows": 393001,
+  "clean_products": 67485,
+  "clean_rating_counts": {
+    "1": 36194,
+    "2": 20762,
+    "3": 29705,
+    "4": 55931,
+    "5": 250409
+  },
+  "word_length_quantiles": {
+    "0.5": 56.0,
+    "0.9": 158.0,
+    "0.95": 213.0,
+    "0.99": 372.0
+  },
+  "fraction_over_256_words": 0.030213663578464178,
+  "splits": {
+    "test": {
+      "rows": 59366,
+      "products": 10199,
+      "rating_counts": {
+        "1": 5482,
+        "2": 3056,
+        "3": 4193,
+        "4": 7920,
+        "5": 38715
+      }
+    },
+    "train": {
+      "rows": 276844,
+      "products": 47394,
+      "rating_counts": {
+        "1": 25369,
+        "2": 14672,
+        "3": 21339,
+        "4": 39927,
+        "5": 175537
+      }
+    },
+    "validation": {
+      "rows": 56791,
+      "products": 9892,
+      "rating_counts": {
+        "1": 5343,
+        "2": 3034,
+        "3": 4173,
+        "4": 8084,
+        "5": 36157
+      }
+    }
+  },
+  "cross_split_product_overlap": 0,
+  "cross_split_normalized_text_overlap": 0
+}

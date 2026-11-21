@@ -1,0 +1,30 @@
+{
+  "y": 1,
+  "alpha": 1,
+  "lambda_ce": 0.5,
+  "near": [
+    0.1,
+    0.8,
+    0.04,
+    0.03,
+    0.03
+  ],
+  "far": [
+    0.1,
+    0.03,
+    0.03,
+    0.04,
+    0.8
+  ],
+  "near_losses": [
+    2.3025850929940455,
+    1.9042963538675706,
+    2.103440723430808
+  ],
+  "far_losses": [
+    2.3025850929940455,
+    6.651595255751293,
+    4.47709017437267
+  ],
+  "note": "Constructed vectors, not model predictions; endpoint and ordering assertions passed."
+}

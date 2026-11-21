@@ -1,0 +1,64 @@
+{
+  "sampling": "Non-random prefix samples; basic structure check only, not full quality certification.",
+  "datasets": {
+    "Amazon_Fashion": {
+      "compressed_file_bytes": 292425439,
+      "downloaded_bytes": 1048576,
+      "checked_records": 1000,
+      "blank_texts": 0,
+      "invalid_ratings": 0,
+      "repeated_normalized_text_rows": 19,
+      "texts_under_3_words": 30,
+      "missing_product_ids": 0,
+      "rating_counts": {
+        "5.0": 505,
+        "2.0": 49,
+        "1.0": 55,
+        "3.0": 125,
+        "4.0": 266
+      }
+    },
+    "Appliances": {
+      "compressed_file_bytes": 270209794,
+      "downloaded_bytes": 1048576,
+      "checked_records": 1000,
+      "blank_texts": 0,
+      "invalid_ratings": 0,
+      "repeated_normalized_text_rows": 24,
+      "texts_under_3_words": 79,
+      "missing_product_ids": 0,
+      "rating_counts": {
+        "5.0": 735,
+        "2.0": 33,
+        "4.0": 113,
+        "1.0": 72,
+        "3.0": 47
+      }
+    },
+    "Handmade_Products": {
+      "compressed_file_bytes": 77803288,
+      "downloaded_bytes": 1048576,
+      "checked_records": 1000,
+      "blank_texts": 0,
+      "invalid_ratings": 0,
+      "repeated_normalized_text_rows": 23,
+      "texts_under_3_words": 54,
+      "missing_product_ids": 0,
+      "rating_counts": {
+        "5.0": 774,
+        "4.0": 117,
+        "1.0": 44,
+        "3.0": 41,
+        "2.0": 24
+      }
+    },
+    "Yelp Review Full": {
+      "downloaded_bytes": 79401,
+      "checked_records": 100,
+      "blank_texts": 0,
+      "invalid_encoded_labels": 0,
+      "repeated_normalized_text_rows": 0,
+      "note": "Labels 0..4 correspond to stars 1..5; no product/business ID in this version."
+    }
+  }
+}

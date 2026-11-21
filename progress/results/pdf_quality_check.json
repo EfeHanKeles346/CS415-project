@@ -1,0 +1,28 @@
+{
+  "pages": 7,
+  "figures": 3,
+  "tables": 7,
+  "bibliography_entries": 14,
+  "unresolved_references": false,
+  "overfull_boxes": false,
+  "archive_integrity": "passed",
+  "source_package_files": [
+    "progress_report.tex",
+    "references.bib",
+    "IEEEtran.cls",
+    "progress_report.pdf",
+    "results/audit_table.tex",
+    "results/baseline_table.tex",
+    "results/error_discussion.tex",
+    "results/loss_table.tex",
+    "results/report_numbers.tex",
+    "results/results_discussion.tex",
+    "results/split_table.tex",
+    "figures/confusion.pdf",
+    "figures/data_profile.pdf",
+    "figures/pipeline.pdf",
+    "README_Overleaf.md"
+  ],
+  "visual_review": "All final pages rendered; layout, figures, and table widths inspected.",
+  "fonts": "All PDF fonts embedded; Times-compatible Nimbus Roman body font verified with pdffonts."
+}

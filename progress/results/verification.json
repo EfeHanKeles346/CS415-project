@@ -1,0 +1,9 @@
+{
+  "verified": true,
+  "rows_checked": 393001,
+  "prediction_files_checked": 6,
+  "metrics_recomputed": 28,
+  "product_overlap": 0,
+  "normalized_text_overlap": 0,
+  "final_test_predictions_present": false
+}

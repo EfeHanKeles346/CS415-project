@@ -1,0 +1,13 @@
+\begin{table}[t]
+\caption{Computed loss illustration, not a trained experiment. True rating is 1, $\alpha=1$, and $\lambda=0.5$.}
+\label{tab:loss}
+\centering\footnotesize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Probability mass pattern & CE & OLL & MLL\\\midrule
+Near-error vector & 2.303 & 1.904 & 2.103\\
+Far-error vector & 2.303 & 6.652 & 4.477\\
+\bottomrule
+\end{tabular}
+\par\smallskip\parbox{\columnwidth}{\scriptsize Near: $(.10,.80,.04,.03,.03)$. Far: $(.10,.03,.03,.04,.80)$. Entries follow star order 1--5.}
+\end{table}

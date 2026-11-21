@@ -1,0 +1,14 @@
+\begin{table*}[t]
+\caption{Validation performance: mean $\pm$ sample standard deviation over seeds 17, 29, and 43. Accuracy and LER are percentages; macro-F1 uses the 0--1 scale; MAE is in stars. The deterministic majority baseline is evaluated once.}
+\label{tab:baselines}
+\centering\footnotesize
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Model & Accuracy $\uparrow$ & Macro-F1 $\uparrow$ & MAE $\downarrow$ & LER $\downarrow$ & Fit time (s)\\\midrule
+Majority & 63.67 & 0.1556 & 0.8259 & 22.10 & --\\
+TF--IDF, unweighted & $73.28 \pm 0.02$ & $0.4538 \pm 0.0012$ & $0.4550 \pm 0.0009$ & $10.35 \pm 0.03$ & $8.75 \pm 0.72$\\
+TF--IDF, balanced & $73.54 \pm 0.01$ & $0.5376 \pm 0.0004$ & $0.3956 \pm 0.0004$ & $7.75 \pm 0.03$ & $10.75 \pm 0.29$\\
+\bottomrule
+\end{tabular}
+
+\end{table*}

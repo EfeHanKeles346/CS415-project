@@ -1,0 +1,13 @@
+# Installed dependencies and machine caches only; project outputs are retained.
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local credentials are never project artifacts.
+.env
+.env.*
+!.env.example
+*.pem
+*.key

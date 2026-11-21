@@ -1,0 +1,156 @@
+\documentclass[conference,a4paper,9pt]{IEEEtran}
+
+\usepackage[T1]{fontenc}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{cite}
+\usepackage[hidelinks]{hyperref}
+\linespread{1}
+
+% Project proposal draft.
+% Helvetica is used as an Arial-equivalent sans-serif font.
+\title{Product Review Rating Prediction}
+\author{}
+
+\begin{document}
+\maketitle
+
+\section*{Group Members and Project Responsibilities}
+
+\noindent\textbf{Efe Han Kele\c{s}:} Prepare the datasets, clean the review texts, and create the training, validation, and test sets.
+
+\noindent\textbf{Mehmet Ege A\c{s}an:} Build and train the deep learning models, and compare the loss functions.
+
+\noindent\textbf{Faris Aleem Ahmad:} Evaluate the models, study prediction errors, and organize the results for the report.
+
+These are initial responsibilities and may change during the project. All members will review the literature, discuss decisions, and write the report together. Each member can help with any task when needed.
+
+\section{Problem Definition and Motivation}
+
+Online shopping websites contain many product reviews. These reviews describe customers' experiences, while star ratings show their overall satisfaction. In this project, we aim to predict a review's rating from its text. The input will be a product review, and the output will be a rating from 1 to 5 stars.
+
+This task is challenging because a review can include both positive and negative opinions. For example, a customer may like the taste of a product but dislike its price. Also, similar comments may receive different ratings because customers have different expectations.
+
+Star ratings have a clear order. Predicting 2 stars for a 1-star review is a smaller error than predicting 5 stars. However, standard classification methods do not directly use this order. We will investigate whether using the order of star ratings during training can reduce large prediction errors. If additional evaluation is needed, we may also test the models on reviews from another product category to examine how well they work on different data.
+
+Predicting ratings from text may help summarize customer feedback when a written review has no star rating. Our goal is to study both how often the model predicts the correct rating and how far its incorrect predictions are from the true rating.
+
+\section{Related Work}
+
+Kim (2014) studied a simple Convolutional Neural Network (CNN) for sentence classification. The model uses word vectors and filters to learn useful patterns from groups of words. The experiments showed that pre-trained word vectors could improve performance compared with randomly initialized vectors. We plan to use the TextCNN architecture described by Kim as one of the architectures in our experiments~\cite{kim2014}.
+
+Sanh et al. (2019) introduced DistilBERT, a smaller version of BERT trained through knowledge distillation. This process transfers information from a larger model to a smaller model. The pre-trained model can then be fine-tuned for tasks such as text classification. We will use DistilBERT to compare a pre-trained Transformer with TextCNN~\cite{sanh2019}.
+
+Dang et al. (2021) combined BERT representations with CNN and Long Short-Term Memory (LSTM) networks. They tested their models on Amazon Fine Food Reviews, which is also the main dataset planned for this project. Their system uses information from review texts to support product recommendations. The review classification part is closely related to our task and provides an example of applying deep learning to the same dataset~\cite{dang2021}.
+
+Other studies focus on the order of the target labels. Chen et al. (2021) showed that accuracy and F1 do not fully describe prediction quality for ordered labels. A model may predict fewer ratings correctly but make smaller errors. Castagnos et al. (2022) proposed Ordinal Log-Loss (OLL), which gives larger penalties to incorrect predictions that are further from the true label. Kasa et al. (2024) compared several ordinal methods and introduced Multitask Log Loss (MLL), which combines cross-entropy with OLL. We plan to apply these existing loss functions to both TextCNN and DistilBERT and compare their effects within each architecture~\cite{chen2021,castagnos2022,kasa2024}.
+
+Generalization is another important issue. Blitzer et al. (2007) studied sentiment classification across different Amazon product categories. Their work shows why a model trained in one category may perform poorly in another. Although their task uses positive and negative labels rather than five star ratings, it motivates a possible additional evaluation on another product category~\cite{blitzer2007}.
+
+Our planned contribution is an experimental comparison of existing methods. Within each architecture, we will examine how different loss functions affect prediction errors while keeping the model structure and evaluation data the same. If we include an additional category test, we will also examine whether any improvements remain on that category.
+
+\section{Datasets}
+\subsection{Main Dataset}
+
+Our main dataset will be Amazon Fine Food Reviews. It contains 568,454 food product reviews with review texts, summaries, ratings from 1 to 5 stars, and product and user information. We will use the review texts and their star ratings to develop and evaluate the models~\cite{finefoods}.
+
+\subsection{Additional Datasets}
+
+We have identified five additional datasets or category subsets that may be used if more data or further evaluation is needed. Four are separate categories from the Amazon Reviews 2023 collection~\cite{amazon2023}:
+
+\begin{itemize}
+\item \textbf{All Beauty:} Approximately 701,500 reviews of beauty products.
+\item \textbf{Amazon Fashion:} Approximately 2.5 million reviews of fashion products.
+\item \textbf{Appliances:} Approximately 2.1 million reviews of household appliances.
+\item \textbf{Handmade Products:} Approximately 664,200 reviews of handmade products.
+\end{itemize}
+
+These subsets include review texts, titles, ratings from 1 to 5 stars, and product IDs.
+
+The fifth option is \textbf{Yelp Review Full}, which contains 700,000 business reviews across five star-rating classes. It provides review texts and rating labels from a different platform~\cite{yelpfull}.
+
+These datasets are optional resources. We will select suitable English reviews only when needed and check their quality before use. We do not plan to use all datasets or combine them automatically.
+
+\section{Proposed Method and Expected Outcomes}
+
+We plan to compare two existing architectures: TextCNN, described by Kim (2014), and DistilBERT, introduced by Sanh et al. (2019)~\cite{kim2014,sanh2019}. These models process text in different ways. Comparing them will help us examine whether the effects of ordinal training depend on the model architecture.
+
+First, we will remove reviews with missing text and check for duplicate reviews. The main dataset will be divided into training, validation, and test sets by product ID. Reviews of the same product will remain in the same set. Each model will use its own suitable tokenizer.
+
+For TextCNN, we will use pre-trained word embeddings to transfer previously learned word information to our task. These embeddings will remain fixed during training. We will train the convolutional layers and the classification layer on our review dataset. The convolutional filters will learn patterns from groups of tokens, while max pooling will collect their strongest responses.
+
+For DistilBERT, we will start with pre-trained model weights and add a classification layer for the five star ratings. We will fine-tune the model on our dataset, updating its pre-trained weights together with the new classification layer. This will allow the learned text representations to adapt to the rating prediction task.
+
+For each architecture, we will compare cross-entropy, Ordinal Log-Loss (OLL), and Multitask Log Loss (MLL)~\cite{castagnos2022,kasa2024}. This creates six main experimental settings. Within each architecture, we will keep the data splits and model structure the same when comparing loss functions. Model settings will be selected using the validation set, with a comparable tuning budget for each loss. We will first run small pilot experiments to check training time and memory needs.
+
+We aim to identify which combinations reduce rating errors while maintaining classification performance. We will also compare training time and examine common prediction errors. The test set will be used only for the final evaluation. Additional datasets may be used if more data or further evaluation is needed.
+
+\section{Research Question and Hypothesis}
+
+Our main research question is: Can we improve rating predictions by teaching models to consider how far a wrong prediction is from the correct rating? For example, predicting 2 stars for a 1-star review is a smaller mistake than predicting 5 stars.
+
+We will compare three training methods using TextCNN and DistilBERT. The first method focuses on predicting the correct rating. The second method, Ordinal Log-Loss (OLL), gives a larger penalty when a prediction is further from the correct rating. The third method, Multitask Log Loss (MLL), combines these two approaches.
+
+We expect the second and third methods to help the models make predictions closer to the true ratings and make fewer large mistakes. We will test this expectation separately for each model. We will also check whether these methods change how often the models predict the exact rating correctly.
+
+\section{Performance Metrics and Success Criteria}
+\subsection{Performance Metrics}
+
+We will evaluate the models using four measures:
+
+\begin{itemize}
+\item \textbf{Accuracy:} The percentage of reviews for which the model predicts the exact star rating.
+\item \textbf{Macro-F1:} A score that gives equal importance to each of the five rating classes. This helps us evaluate performance even when some ratings appear more often than others.
+\item \textbf{Mean Absolute Error (MAE):} The average distance between predicted and true ratings. For example, predicting 4 stars instead of 2 creates an error of 2. Lower values are better.
+\item \textbf{Large Error Rate:} The percentage of predictions that differ from the true rating by 2 or more stars. Lower values mean fewer large mistakes.
+\end{itemize}
+
+We will also record training time on the same hardware. Each experimental setting will be run three times with different random seeds, using the same data splits. We will report the average results and their variation.
+
+\subsection{Numerical Success Criteria}
+
+We will compare OLL and MLL with cross-entropy separately within TextCNN and DistilBERT. Our target is for at least one of these methods, in at least one architecture, to meet all three conditions:
+
+\begin{itemize}
+\item Reduce MAE by at least \textbf{3\%} relative to cross-entropy.
+\item Reduce the large error rate by at least \textbf{5\%} relative to cross-entropy.
+\item Keep the decrease in Macro-F1 within \textbf{0.01} on the 0--1 scale.
+\end{itemize}
+
+These targets will be evaluated using the average test results from the three runs. Meeting them in both architectures would provide stronger support for our hypothesis. We will report the findings even if the targets are not reached.
+
+\begin{thebibliography}{10}
+
+\bibitem{kim2014}
+Y. Kim, ``\href{https://aclanthology.org/D14-1181/}{Convolutional Neural Networks for Sentence Classification},'' in \emph{Proc. EMNLP}, 2014, pp. 1746--1751.
+
+\bibitem{sanh2019}
+V. Sanh, L. Debut, J. Chaumond, and T. Wolf, ``\href{https://arxiv.org/abs/1910.01108}{DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter},'' arXiv:1910.01108, 2019.
+
+\bibitem{dang2021}
+C. N. Dang, M. N. Moreno-Garc\'{i}a, and F. De la Prieta, ``\href{https://doi.org/10.3390/s21165666}{An Approach to Integrating Sentiment Analysis into Recommender Systems},'' \emph{Sensors}, vol. 21, no. 16, art. 5666, 2021.
+
+\bibitem{chen2021}
+D. Z. Chen, M. Courtland, A. Faulkner, and A. Ezen-Can, ``\href{https://aclanthology.org/2021.eval4nlp-1.19/}{Error-Sensitive Evaluation for Ordinal Target Variables},'' in \emph{Proc. Eval4NLP}, 2021, pp. 189--199.
+
+\bibitem{castagnos2022}
+F. Castagnos, M. Mihelich, and C. Dognin, ``\href{https://aclanthology.org/2022.coling-1.407/}{A Simple Log-based Loss Function for Ordinal Text Classification},'' in \emph{Proc. COLING}, 2022, pp. 4604--4609.
+
+\bibitem{kasa2024}
+S. R. Kasa et al., ``\href{https://aclanthology.org/2024.findings-acl.320/}{Exploring Ordinality in Text Classification: A Comparative Study of Explicit and Implicit Techniques},'' in \emph{Findings of ACL}, 2024, pp. 5390--5404.
+
+\bibitem{blitzer2007}
+J. Blitzer, M. Dredze, and F. Pereira, ``\href{https://aclanthology.org/P07-1056/}{Biographies, Bollywood, Boom-boxes and Blenders: Domain Adaptation for Sentiment Classification},'' in \emph{Proc. ACL}, 2007, pp. 440--447.
+
+\bibitem{finefoods}
+Stanford Network Analysis Project, ``\href{https://snap.stanford.edu/data/web-FineFoods.html}{Amazon Fine Foods reviews},'' dataset. Accessed: Oct. 22, 2026.
+
+\bibitem{amazon2023}
+Y. Hou, J. Li, Z. He, A. Yan, X. Chen, and J. McAuley, ``Bridging Language and Items for Retrieval and Recommendation,'' arXiv:2403.03952, 2024. Dataset: \href{https://amazon-reviews-2023.github.io/}{Amazon Reviews 2023}.
+
+\bibitem{yelpfull}
+``\href{https://huggingface.co/datasets/Yelp/yelp_review_full}{Yelp Review Full},'' dataset card, Hugging Face. Accessed: Oct. 22, 2026.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,39 @@
+{
+  "seeds": [
+    17,
+    29,
+    43
+  ],
+  "alpha": 1e-05,
+  "max_iter": 30,
+  "tol": 0.0001,
+  "ngram_range": [
+    1,
+    2
+  ],
+  "min_df": 3,
+  "max_features": 60000,
+  "actual_features": 60000,
+  "sublinear_tf": true,
+  "normalization": "L2",
+  "word_token_pattern": "(?u)\\b\\w\\w+\\b",
+  "train_rows": 276844,
+  "validation_rows": 56791,
+  "vectorization_seconds": 20.783739125006832,
+  "variants": [
+    "unweighted",
+    "balanced"
+  ],
+  "evaluation_split": "validation",
+  "test_predictions_computed": false,
+  "classifier": "SGDClassifier: one-vs-rest binary logistic losses; not a five-class softmax CE model",
+  "weighting": "balanced: n_train / (5 * training count for class)",
+  "python": "3.12.14",
+  "sklearn": "1.9.1",
+  "numpy": "2.5.5",
+  "scipy": "1.18.1",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "machine": "arm64",
+  "cpu": "Apple M3 Pro",
+  "thread_limit": 1
+}

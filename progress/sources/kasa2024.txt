@@ -1,0 +1,1151 @@
+                        Exploring Ordinality in Text Classification:
+                   A Comparative Study of Explicit and Implicit Techniques
+             Siva Rajesh Kasa*                         Aniket Goel*                          Karan Gupta*
+               Amazon, India                            IIIT Dehli                            Amazon, India
+           kasasiva@amazon.com                   aniket20281@iiitd.ac.in                  karaniis@amazon.com
+
+Sumegh Roychowdhury* Anish Bhanushali    Nikhil Pattisapu Prasanna Srinivasa Murthy
+     Amazon, India     Amazon, India      Amazon, India         Amazon, India
+  sumegr@amazon.com ankeeb@amazon.com npattisa@amazon.com sprsn@amazon.com
+
+                             Abstract                               inherent characteristics for the classification task.
+                                                                    Thus, while the former represents a time-tested ap-
+          Ordinal Classification (OC) is a widely en-               proach, the latter offers a new way to tackle OC,
+          countered challenge in Natural Language Pro-              bringing the richness of semantic information into
+          cessing (NLP), with applications in various do-
+                                                                    the classification process. Our paper comprehens-
+          mains such as sentiment analysis, rating predic-
+          tion, and more. Previous approaches to tackle             ively studies the different techniques that fall under
+          OC have primarily focused on modifying ex-                both these strategies. The classical approach re-
+          isting or creating novel loss functions that ex-          lies on tweaking Cross Entropy (CE) which is a
+          plicitly account for the ordinal nature of labels.        commonly used loss function for nominal classi-
+          However, with the advent of Pretrained Lan-               fication (NC) (where the assumption is that the
+          guage Models (PLMs), it became possible to                classes are mutually exclusive and have no inher-
+          tackle ordinality through the implicit semantics
+                                                                    ent order or relationship to each other) (Yamasaki,
+          of the labels as well. This paper provides a com-
+          prehensive theoretical and empirical examina-             2022; Castagnos et al., 2022; Díaz and Marathe,
+          tion of both these approaches. Furthermore, we            2019). The performance in NC task is usually meas-
+          also offer strategic recommendations regarding            ured in terms of accuracy-based metrics such F1
+          the most effective approach to adopt based on             scores. While CE is optimal for NC, since it treats
+          specific settings.                                        all misclassifications as the same, it is sub-optimal
+                                                                    for OC. There are several approaches/tweaks pro-
+  1       Introduction                                              posed to extend CE loss for OC, such as the ones
+                                                                    proposed by Díaz and Marathe (2019); Castagnos
+  Ordinal classification (OC) is a key task in natural
+                                                                    et al. (2022), which adds a penalty based on the
+  language processing (NLP), with many applica-
+                                                                    absolute difference in the class rankings. These
+  tions that require ordering or ranking in the output
+                                                                    loss functions are designed such that the more the
+  such as Sentiment Analysis (Dang et al., 2020),
+                                                                    distance between prediction and ground truth, the
+  Rating Prediction (Liu, 2020), Age Group Classi-
+                                                                    more the penalty. The performance of these OC
+  fication (Sánchez-Hevia et al., 2022), etc. In each
+                                                                    tasks is measured in terms of Mean Squared Error
+  of these examples, the output categories have a
+                                                                    (MSE), Mean Absolute Error (MAE) and Off-by-1
+  natural order, making these tasks suited to ordinal
+                                                                    (OB1) accuracy (Castagnos et al., 2022).
+  classification.
+                                                                       Our work fills a crucial gap in the current un-
+     Broadly speaking, OC task can be tackled us-
+                                                                    derstanding of these losses used in OC. Prior to
+  ing one of the following two approaches - explicit
+                                                                    our research, a unifying analysis of these different
+  vs implicit. The classical explicit approach relies
+                                                                    loss based approaches was conspicuously absent,
+  on tweaking the loss function based on an explicit
+                                                                    making it challenging to holistically compare and
+  notion of distance between labels and penalising
+                                                                    contrast their characteristics and performance. In
+  based on the degree of misclassification (Castagnos
+                                                                    an attempt to address this lacuna, we evaluate these
+  et al., 2022; Díaz and Marathe, 2019). Alternat-
+                                                                    loss functions for four desirable properties, namely,
+  ively, the second implicit approach we propose is
+                                                                    proper scoring rule, unimodality, convexity and or-
+  based on more recent advancements in language
+                                                                    dinality. We also propose a loss function which
+  modeling. This approach organically engages the
+                                                                    exhibits these desirable properties while demon-
+  semantics of the labels, thereby harnessing their
+                                                                    strating that several of these loss functions can be
+      *
+          These authors contributed equally to this work            interpreted as specialized versions of the proposed
+                                                               5390
+                        Findings of the Association for Computational Linguistics: ACL 2024, pages 5390–5404
+                                August 11-16, 2024 ©2024 Association for Computational Linguistics
+generalized loss function.                                   • Further, we study two general PLM based
+   Pretrained Language Models (PLMs), which in-                methodologies (encoder & decoder-based)
+clude both encoder models (like BERT (Devlin                   that implicitly factor in ordinality. These ap-
+et al., 2019)) and decoder models (like GPT (Rad-              proaches signify a paradigm shift from tradi-
+ford et al., 2018a)), offer a robust mechanism to              tional methods, opening up new avenues in
+learn the semantics or representations of words.               ordinal classification.
+These models are trained on vast amounts of text
+data, during which they develop an understanding             • Lastly, we undertake an exhaustive compar-
+of the context in which words are used. Encoder                ison of these explicit and implicit approaches
+models like BERT learn to predict a word based on              under different scenarios, providing neces-
+its surrounding context, thereby creating a rich and           sary ablations and conclude by offering stra-
+nuanced understanding of word semantics. On the                tegic recommendations on the suitable choice
+other hand, decoder models like GPT generate a se-             between these approaches in §6.
+quence of words, learning to predict the next word
+in a sentence, hence understanding semantics in a           The rest of the paper is organized as follows:
+left-to-right context manner. This learning process      In §2, we discuss the various explicit approaches
+enables these models to develop high-dimensional         i.e. review the loss functions and discuss their the-
+vector representations (embeddings) that capture         oretical properties. Using this as motivation, we
+the underlying semantics of words.                       also propose a new hybrid loss function and study
+   Interestingly, these semantically rich embed-         it’s properties. In §3, we discuss the encoder mod-
+dings can be utilized to implicitly factor in the or-    els and show how OC can be approached from an
+dinality of labels in OC tasks. The numeric vector       entailment-style modeling perspective. In §4, we
+representation of words inherently carries semantic      discuss the decoder models and how OC can be ap-
+relationships that can mirror ordinal relationships.     proached from a next word prediction task perspect-
+For instance, the embeddings of words like "good",       ive. Figure 2 depicts the explicit as well as implicit
+"neutral", and "bad" reflect their comparative se-       approaches. In §5, we empirically compare these
+mantics in the vector space. When used for OC            three methods and give our recommendations.
+tasks, such as sentiment analysis or rating predic-
+tion, these learned embeddings can provide a more
+                                                         2    Explicit approach: Loss-functions and
+natural and effective way to understand and encode            Analysis
+the ordinality of labels. The model does not just
+see these labels as distinct classes, but as points on                   Loss    PSR     UM     CX    Ord
+                                                                         CE       ✓       ×     ✓     low
+some latent space, thus allowing a more nuanced                         OLL       ✓       ×     ✓     high
+                                                                        MLL       ✓       ×     ✓     high
+approach to such classification tasks.                                  SOFT      ×       ×     ✓     low
+                                                                        EMD       ✓             ✓     low
+   In our study, we make the following contribu-                       CORAL      ✓
+                                                                                          ×
+                                                                                          ×     ✓     low
+tions to advance the understanding and application                     VS-SL      ×      ✓      ×     low
+                                                                        WKL       ✓       ×     ×     low
+of OC in NLP:
+                                                         Table 1: Various properties satisfied by different loss
+   • We conduct a comprehensive analysis of sev-         based approaches. Notation: PSR - Proper Scoring Rule,
+     eral explicit loss-based approaches for Ordinal     UM - Unimodality, CX - Convexity, Ord - Ordinality
+     Classification (OC), examining them through
+     the lens of useful theoretical properties, such        Let {(Xi , yi )}N     i=1 be N independent and identic-
+     as proper scoring rule, convexity, unimodality      ally distributed datapoints containing the input fea-
+     and ordinality. Our empirical findings demon-       tures Xi and their corresponding labels yi ; where
+     strate that previously proposed techniques for      yi ∈ {1, . . . , K} where K is the number of classes.
+     solving OC excel primarily in ordinal metrics       The output of the classifier is denoted by Φθ (Xi ) =
+     while compromising performance on nominal           p̂i = (pˆi1 , . . . , piˆK ) which is a probability distribu-
+     metrics. This analysis has led us to propose        tion over the K classes. Let I(yi ) be the one-hot en-
+     a hybrid loss function that achieves a better       coding of yi . The classifier is trainedP by optimizing
+     balance between nominal and ordinal metrics         the parameters θ such that N1 N            i=1 Lθ (p̂i , I(yi ))
+     compared to the performance of its individual       reaches a minimum. In the rest of the paper, for
+     components.                                         ease of understanding, we omit the indexing with
+                                                     5391
+            probability
+
+excellent       17%
+  good        11%
+ average                   50%
+   bad        13%
+  awful      9%
+
+
+            probability
+
+excellent   5%
+  good       10%
+ average                   50%
+   bad           20%
+  awful        15%
+
+Figure 1: Classifier output on
+the top does not satisfy UM as
+the probabilities do not decrease   Figure 2: [Best viewed in color] (1) Explicit Approach: We explicitly impose ordinality
+monotonically on either side of     in the predictions by designing losses like MLL, OLL, etc. (2) Implicit Approach: In
+the max probability label (label:   this entailment technique, ordinality is implicitly enforced by passing the label semantic
+average); whereas the classifier    information in the input itself. (3) Here we use a decoder LM to auto-regressively predict
+output on the bottom satisfies      the label in natural language format given the input sentence. (Notation: P LME : Encoder
+UM                                  PLM, P LMD : Decoder PLM)
+
+                                    P
+respect to i, i.e. remove the N1 and Ni=1 , wherever            ities from the classifier in the context of OC.
+it is evident from the loss expression.                            Unimodality (UM): If the output probabilities
+    In the next subsection, we give a few desirable             have single mode, i.e. pˆj > p̂l < pˆi is not satisfied
+theoretical properties of the loss function L in the            for any 1 ≤ j < l < i ≤ K, then we say the
+context of OC and then follow it up by discussing               classifier satisfies the UM condition (Beckham and
+some of the widely used loss functions.                         Pal, 2017; Yamasaki, 2022; Iannario and Piccolo,
+                                                                2011). An illustration is given in Figure 1.
+2.1 Desirable Properties of Losses in OC                           Ordinality (Ord): In the context of OC, we
+Proper Scoring Rule (PSR): A loss is said to be                 require the loss L to explicitly penalize the mis-
+a PSR (Gneiting and Raftery, 2007; Merkle and                   classifications more which are farther away from
+Steyvers, 2013) if it takes the lowest value when               each other compared to the ones which are closer.
+the predicted class probabilities match the ground              The goal is to enforce a meaningful ordering among
+truth which is a one-hot encoded K-dimensional                  the labels unlike nominal classifcation where cat-
+vector. Being PSR ensures that the loss indeed                  egories lack a specific order. We will see later that
+tries to optimize the classifier to predict the ground          different loss functions enforce ordinality to a vary-
+truth without injecting any bias in the predicted               ing degree.
+outputs. Further, PSR losses also help to produce               In the next subsection, we discuss some of the
+well calibrated probabilities (Lakshminarayanan                 widely used loss functions in the context of OC in
+et al., 2017).                                                  NLP.
+    Convexity (Cx): Convexity of L with respect to
+p̂ is a desirable property of the loss as it is an essen-       2.2    Widely used Loss Functions in OC
+tial requirement for several convex formulations of             Cross-Entropy (CE): CE is given by
+Neural Networks (NNs) (Kawaguchi et al., 2019;                                   K
+                                                                                 X
+Du et al., 2019; Pilanci and Ergen, 2020; Wojtow-                              −     pk log(p̂k )                         (1)
+ytsch, 2023). Further, if both L and Φ (classifier                                     k=1
+function) are convex with respect to θ (as in the               The above expression boils down to − log(p̂yi ).
+case of logistic regression or support vector ma-               Oftentimes CE is discredited for not being able to
+chines), then it is guaranteed that the local minima            factor in ordering as its expression does not take
+indeed coincides with the global minima.                        into account the probabilities corresponding to the
+    Several widely used losses such CE, MAE, MSE,               non-groundtruth classes.
+etc. are both PSRs and Convex. Next, we look at                    Ordinal Log Loss (OLL) (Castagnos et al.,
+two desirable characteristics of the output probabil-           2022): OLL is given by
+                                                           5392
+                                                        UM in their work and hence, we use it as a baseline
+              X
+            −  |k − y|α log(1 − p̂k ).           (2)    in our experiments.
+              k̸=y                                         We also include two more loss function variants,
+   Here α > 0 is a hyperparameter. This can be          namely COnsistent RAnk Logits (CORAL) (Cao
+seen as a complementary of CE where the miss-           et al., 2020) and Weighted Kappa Loss (WKL)
+classification is explicitly penalized in proportion    (de la Torre et al., 2017), and benchmark their ef-
+to its degree by the term |k − y|α . Both CE and        fectiveness in terms of accuracy and ordinality.
+OLL belong to PSR family as both these losses are          To benchmark the performance of the above loss
+zero when the output probabilities coincide with        functions, we run experiments on three benchmark
+the ground truth one-hot encoding.                      multi-class text classification datasets, each with
+   SOFT labels (SOFT) (Díaz and Marathe,                distinct tasks: Hypothesis entails Premise task -
+2019): In this approach, first the ground truth K-      SNLI (Bowman et al., 2015), Reviews Classifica-
+dimensional onehot encoded is modified to K ‘soft’      tion task - Amazon Reviews (AR) (Keung et al.,
+labels as follows.                                      2020), and Sentiment Analysis task - SST-5 (Socher
+                      exp(−β|k − y|)                    et al., 2013). We report weighted-F1 scores and
+           psoft =P                               (3)
+            k                       ′
+                      k′ exp(−β|k − y|)
+                                                        MAE, MSE, Off-by-1 (OB1) accuracy to measure
+   Then CE loss can be computed using these soft        both classification and ordinal performance respect-
+ground labels as truth probabilities.                   ively. In the interest of space, we present the details
+                   XK                                   of datasets and metrics in Appendix A and B.
+                 −      psoft
+                         k log(p̂k )              (4)      We observe that in general CE performs best in
+                     k=1                                terms of nominal metrics (like weighted-F1) and
+   Clearly, introducing softlabels makes this ap-       OLL performs best in terms of ordinal metrics on
+proach not fall in the PSR family as the ground-        an average. However, there seems to be a trade-
+truth onehot encoding vector does not minimize          off between nominal and ordinal performance i.e.
+the loss anymore.                                       the improvement in ordinal metrics comes at the
+   Earth Mover Distance (EMD) (Rubner et al.,           expense of nominal metrics. However, given that
+2000) : EMD or Wasserstein loss is defined              all these metrics are also from the PSR family, and
+       EMD = (CDF(I(yi )) − CDF(p̂i ))2                 in some sense are not independent of each other
+                                                        as a perfect classifier would improve both these
+    Here CDF refers to the cumulative distribution
+                                                        metrics simultaneously. This intuition prompted
+function. While EMD is a PSR, it does not impose
+                                                        us to experiment with a weighted combination of
+a strong penalty in the tails (as compared to OLL)
+                                                        CE and OLL, which we have named Multitask Log
+because CDFs are monotonic with range in [0, 1]
+                                                        Loss (MLL), hypothesizing that it would inherit
+and hence the difference between the CDFs will be
+                                                        the best attributes of both methods.
+small in the tails.
+                                                           Multi-task log loss function (MLL): MLL is
+    Unimodal Losses: da Costa et al. (2008) and
+                                                        given by
+Beckham and Pal (2017) introduced a parametric
+way to force unimodality in the predicted probab-              M LL = λ × CE + (1 − λ) × OLL               (5)
+ility scores by first computing a scalar function       Here, λ ∈ [0, 1] is a hyperparameter. MLL satisfies
+f (x) ∈ [0, 1] and then using this scalar to paramet-   both convexity and PSR conditions. Further, while
+erise a Binomial distribution Bin(f (x)). The Prob-     OLL and MLL are not theoretically guaranteed to
+ability Mass Function (PMF) is computed which           be UM, but empirically have been found to be sat-
+forms the final predicted probabilities. Note that      isfying UM condition for 80-90% test datapoints
+the computing a single scalar f (x) (as opposed a       which we show later in Figure 4. A summary of
+vector of embeddings as done in other methods)          the properties satisfied by different loss-based ap-
+severely hampers the learning; thus the guarantee       proaches is given in Table 1, with discussions in
+of unimodality comes at the cost of degradation         Appendix D and E. Note that while it’s theoretic-
+in performance. To address this, Yamasaki (2022)        ally possible to consider weighted combinations
+proposes a more-flexible unimodal OC framework          involving other loss functions, we only considered
+by imposing shape-based constraints on the output       CE and OLL here because OLL has already been
+probabilities; the V-Shaped Stereotyped Logit (VS-      shown to outperform other losses in terms of or-
+SL) method has shown to be the state-of-the-art for     dinal metrics (Castagnos et al., 2022) and we aimed
+                                                    5393
+                                                                                         Dataset        Loss    LR        F1     MSE        MAE      OB1
+to improve its performance in term of nominal met-                                                      CE      1E-05     0.484 0.761       0.576    0.925
+                                                                                                                          (0.01) (0.04)     (0.02)   (0.01)
+rics as well, by adding with the CE term.                                                               MLL     5E-05     0.492 0.757       0.575    0.931
+                                                                                                                          (0.01) (0.01)     (0.02)   (0.00)
+                                                                                                        OLL     5E-05     0.456 0.735       0.586    0.927
+   We follow Castagnos et al. (2022) and using                                         SST5
+                                                                                                                          (0.01) (0.00)     (0.01)   (0.00)
+                                                                                                        WKL     2.5E-05   0.488 0.751       0.584    0.926
+TinyBERT as the backbone model, ran CE, OLL,                                                                              (0.00) (0.01)     (0.03)   (0.03)
+                                                                                                        SOFT    1E-05     0.486 0.761       0.581    0.924
+MLL, SOFT, EMD, CORAL, WKL and VS-SL                                                                                      (0.00) (0.01)     (0.02)   (0.01)
+                                                                                                        EMD     7.5E-05   0.466 0.770       0.592    0.916
+on the three real datasets mentioned in Appendix                                                                          (0.01) (0.02)     (0.01)   (0.00)
+                                                                                                        CORAL   1E-05     0.450 0.927       0.717    0.923
+A and compute the both the nominal and ordinal                                                                            (0.02) (0.00)     (0.01)   (0.00)
+                                                                                                        VS_SL   1E-05     0.2764 2.663      1.204    0.670
+metrics mentioned in Appendix B. The results are                                                                          (0.04) (0.02)     (0.08)   (0.08)
+given in Table 2.                                                                                       CE      1E-05     0.586    0.675    0.485    0.938
+                                                                                                                          (0.04)   (0.01)   (0.06)   (0.03)
+                                                                                                        MLL     5E-05     0.589    0.634    0.476    0.945
+                                                                                                                          (0.04)   (0.01)   (0.06)   (0.03)
+                                                                                                        OLL     2.5E-05   0.586    0.622    0.477    0.948
+
+
+
+
+                                                                                       Amazon Reviews
+         Dataset        Loss    LR        F1       MSE      MAE      OB1                                                  (0.00)   (0.00)   (0.00)   (0.00)
+                        CE      2.5E-05   0.357    1.197    0.768    0.852                              WKL     1E-05     0.582    0.641    0.482    0.944
+                                          (0.01)   (0.00)   (0.02)   (0.00)                                               (0.02)   (0.03)   (0.07)   (0.01)
+                        MLL     1E-04     0.378    1.125    0.742    0.863                              SOFT    1E-05     0.584    0.681    0.489    0.937
+                                          (0.02)   (0.01)   (0.01)   (0.00)                                               (0.00)   (0.00)   (0.00)   (0.00)
+                        OLL     2.5E-05   0.359    1.055    0.740    0.870                              EMD     5E-05     0.580    0.652    0.490    0.942
+                                          (0.02)   (0.00)   (0.01)   (0.00)                                               (0.00)   (0.01)   (0.00)   (0.00)
+       SST5             WKL     7.5E-05   0.366    1.250    0.809    0.847                              CORAL   5E-05     0.406    1.231    0.865    0.966
+                                          (0.00)   (0.00)   (0.02)   (0.01)                                               (0.00)   (0.01)   (0.01)   (0.00)
+                        SOFT    1E-04     0.382    1.152    0.751    0.856                              VS_SL   7.5E-05   0.328    1.613    0.907    0.786
+                                          (0.00)   (0.00)   (0.03)   (0.00)                                               (0.01)   (0.02)   (0.05)   (0.00)
+                        EMD     1E-04     0.354    1.125    0.744    0.857
+                                          (0.02)   (0.03)   (0.02)   (0.03)                             CE      5E-05     0.890    0.152    0.123    0.985
+                        CORAL   1E-04     0.109    2.739    1.281    0.641                                                (0.02)   (0.04)   (0.01)   (0.01)
+                                          (0.00)   (0.01)   (0.06)   (0.00)                             MLL     5E-05     0.891    0.149    0.122    0.986
+                        VS_SL   2.5E-05   0.233    2.099    1.087    0.710                                                (0.02)   (0.04)   (0.02)   (0.01)
+                                          (0.05)   (0.02)   (0.09)   (0.01)                             OLL     5E-05     0.890    0.143    0.121    0.989
+                                                                                                                          (0.01)   (0.00)   (0.01)   (0.00)
+                                                                                       SNLI             WKL     1E-05     0.865    0.184    0.152    0.984
+                        CE      1E-04     0.543    0.904    0.581    0.903
+                                          (0.02)   (0.04)   (0.01)   (0.00)                                               (0.01)   (0.01)   (0.00)   (0.00)
+                        MLL     7.5E-05   0.544    0.819    0.568    0.915                              SOFT    5E-05     0.889    0.160    0.127    0.980
+                                          (0.00)   (0.01)   (0.00)   (0.00)                                               (0.02)   (0.02)   (0.04)   (0.00)
+                        OLL     1E-04     0.530    0.788    0.571    0.924                              EMD     1E-05     0.890    0.154    0.126    0.985
+
+
+
+
+       Amazon Reviews
+                                          (0.00)   (0.00)   (0.00)   (0.00)                                               (0.00)   (0.04)   (0.02)   (0.00)
+                        WKL     5E-05     0.515    0.871    0.594    0.907                              CORAL   7.5E-05   0.885    0.189    0.128    0.988
+                                          (0.00)   (0.00)   (0.01)   (0.05)                                               (0.00)   (0.01)   (0.01)   (0.00)
+                        SOFT    7.5E-05   0.537    0.904    0.586    0.903                              VS_SL   2.5E-05   0.810    0.300    0.226    0.963
+                                          (0.00)   (0.00)   (0.01)   (0.00)                                               (0.01)   (0.01)   (0.01)   (0.00)
+                        EMD     5E-05     0.534    0.885    0.584    0.904
+                                          (0.00)   (0.00)   (0.00)   (0.00)
+                        CORAL   1E-04     0.349    1.363    0.781    0.890       Table 3: Loss functions comparison on three datasets
+                        VS_SL   5E-05
+                                          (0.00)
+                                          0.377
+                                                   (0.01)
+                                                   1.535
+                                                            (0.01)
+                                                            0.853
+                                                                     (0.00)
+                                                                     0.793
+                                                                                 using BERT-base architecture
+                                          (0.05)   (0.08)   (0.03)   (0.02)
+
+                        CE      5E-05     0.821    0.264    0.208    0.972
+
+                        MLL     7.5E-05
+                                          (0.00)
+                                          0.832
+                                                   (0.00)
+                                                   0.257
+                                                            (0.02)
+                                                            0.205
+                                                                     (0.01)
+                                                                     0.974
+                                                                                 3   Implicit approach: Entailment-style
+                        OLL     1E-04
+                                          (0.00)
+                                          0.803
+                                                   (0.01)
+                                                   0.250
+                                                            (0.01)
+                                                            0.217
+                                                                     (0.00)
+                                                                     0.980
+                                                                                     Encoder Models
+                                          (0.01)   (0.03)   (0.01)   (0.02)
+       SNLI             WKL     1E-04     0.782
+                                          (0.01)
+                                                   0.289
+                                                   (0.03)
+                                                            0.242
+                                                            (0.02)
+                                                                     0.975
+                                                                     (0.00)      Wang et al. (2021) proposed reformulating vanilla
+                        SOFT    1E-04     0.824
+                                          (0.00)
+                                                   0.257
+                                                   (0.01)
+                                                            0.203
+                                                            (0.00)
+                                                                     0.972
+                                                                     (0.00)
+                                                                                 classification into an entailment-style task to en-
+                        EMD     1E-04     0.826
+                                          (0.00)
+                                                   0.250
+                                                   (0.00)
+                                                            0.199
+                                                            (0.01)
+                                                                     0.975
+                                                                     (0.00)
+                                                                                 hance the few-shot capabilities of PLMs. Here, the
+                        CORAL   1E-04     0.815
+                                          (0.00)
+                                                   0.251
+                                                   (0.02)
+                                                            0.207
+                                                            (0.02)
+                                                                     0.977
+                                                                     (0.01)
+                                                                                 model learns to predict whether the input text and
+                        VS_SL   5E-05     0.778
+                                          (0.02)
+                                                   0.339
+                                                   (0.04)
+                                                            0.261
+                                                            (0.03)
+                                                                     0.955
+                                                                     (0.00)
+                                                                                 the label entail each other or not (similar to Natural
+                                                                                 Language Inference (NLI) setting), leveraging the
+Table 2: Loss functions comparison on three datasets                             inherent semantic relationship between the label
+using BERT-tiny architecture                                                     and input text. We adopt a similar approach for our
+                                                                                 task and explore it through the lens of ordinality,
+                                                                                 which has not been studied in prior works.
+   In order to facilitate fair comparison across expli-                             We assume the existence of a classifier, based
+cit and implicit approaches (discussed in the later                              on Pretrained Language Model (PLM), called Φθ .
+sections), we repeat the same experiments with                                   Let L = {L1 , L2 , . . . , LK } be the collection of
+BERT-base-uncased. The results are given in Table                                textual labels. The training dataset can be divided
+3 (refer Appendix C for the implementation details).                             based on the labels into Dtr , which consists of sub-
+Note that the performance of different loss func-                                sets D1 , D2 , . . . , DK . Each subset contains the
+tions is better contrasted when the size of the base                             available training data {xki }ni=1
+                                                                                                                  k
+                                                                                                                     for label Lk . The
+model is small, which is usually the case in online                              corresponding test data is represented by Dtst .
+settings where we cannot deploy larger models.                                      During the training phase in Dtr , the following
+                                                                              5394
+entailment-style data augmentation technique is           GPT series (Radford et al., 2018a,b; Brown et al.,
+employed: For each data point xij with a ground           2020) has led to state-of-the-art results in text gen-
+truth label of Lj , K samples ({skij }K
+                                      k=1 ) are gener-    eration and summarization benchmarks. One of the
+ated and augmented as follows:                            primary objectives of this paper is to investigate
+    skij = {xij + verbaliser(Lk ), 1j (k)}K         (6)   whether these models demonstrate ordinal beha-
+                                          k=1
+                                                          vior by accurately capturing the inherent order or
+   Here, 1j (k) is an indicator function that yields
+                                                          ranking of elements in the generated text.
+1 if k = j else 0. The ‘+’ operator denotes con-
+catenation operation (refer §C), and verbaliser()            Formally, in the context of OC, for a given a tex-
+is a pre-defined template (specific to the down-          tual input xi which comprises the following words
+stream task) describing the label in natural lan-         (wi1 , wi2 , . . . , win ) and its corresponding ground
+guage. For example, in sentiment classification           truth label Li , we append the input and label as
+task verbaliser(Lj = positive) can be described           (wi1 , wi2 , . . . , win , Li ). Next, the parameters θ of
+as: indicates positive sentiment. See Fig-                generative model are finetuned s.t.
+                                                                                   N
+ure 2 for example.                                                               X
+   Essentially, for each data point, (K − 1) neg-            θ∗ = arg max             log P (wi1 , . . . , win , Li ; θ)
+                                                                         θ     i=1
+ative samples and 1 positive sample are created.
+Finally the problem reduces to the following NLI          During inference for ith input xi , the generative
+task - Does x                                             model predicts the word win+1 from the vocabulary
+             Pij entail verbaliser(Lj ) or not? Once
+these K × nk augmented examples are gener-                V which maximizes the conditional probability:
+ated, the parameters θ are finetuned for a binary            L̂ = arg max{log P (win+1 |wi1 , . . . , ; θ∗ )} (8)
+                                                                   win+1 ∈V
+classification task, where skij serves as the input
+and 1j (k) acts as the ground truth. During the in-          Further, it is possible that the predicted label may
+ference phase, for a datapoint x the predicted label      not be in the set of ground truth labels i.e. for an ith
+L̂ is obtained using:                                     input xi the label L̂i ∈ / L where L is the set of K
+    L̂ = arg max{Φθ (sk )} ∀ i ∈ {1, . . . , nk }   (7)   distinct labels (see Appendix 9). This is the notori-
+             k                                            ous hallucination problem associated with generat-
+During inference for x, sk is computed following          ive models. To mitigate this issue during inference,
+Eq. 6 and softmax() is applied on the predicted           we compare the conditional log-probabilities of
+logits before taking argmax so that all the class         each the K labels , given the text segment xi . The
+probabilities sum up to 1. As the model leverages         class corresponding to the highest probability is
+the natural language meanings of the labels dur-          proposed as the generated label. That is, given that
+ing training, we argue it is inherently capable of        θ∗ represents the learned parameters of LM, the
+learning to predict labels that are ordinally consist-    label selection during inference will be s.t.
+ent. For instance, the model learns to comprehend             L̂ = arg max log P (Lj |wi1 , . . . , win ; θ∗ )      (9)
+that the label very negative sentiment is closer                      Lj ∈L
+in semantic space to negative sentiment than              Here (wi1 , wi2 , . . . , win ) are the words in input xi
+to very positive sentiment. This understand-              and (L1 , L2 , . . . , LK ) are the labels in the set L.
+ing prevents the model from deviating significantly          For fair comparison with other explicit and im-
+from the actual ground truth. In contrast, in the         plicit approaches, we use GPT2-small as our base
+case of vanilla CE, these labels are treated solely       model for experiments to maintain similar number
+as numbers, disregarding their inter-semantic re-         of model parameters (with BERT-base). Similar to
+lations. We again use BERT-base here as base              the entailment approach (§3), we also experiment
+model for performing experiments. The exact label         with informative and un-informative verbalisers
+verbalisers used for all datasets are mentioned in        here.
+Appendix 8.
+                                                             Motivated by recent advancements and the ac-
+4    Implicit approach: Generative Models                 cessibility of open-source Large Language Models
+                                                          (LLMs), and to demonstrate the true potential of
+Decoder-based text generative models have seen            the generative approach, we also experiment with
+notable advancements in recent years, facilitating        Llama-7B (Touvron et al., 2023), a decoder-based
+the production of coherent and contextually rel-          LLM with 7 billion parameters. Pre-trained on
+evant text. The development of models like the            trillions of tokens using publicly available data, it
+                                                      5395
+                       100 %                                   100 %                          50 %                          25 %                         10 %
+    Dataset Metric CE MLL                           CE MLL ENT GPT                CE MLL ENT GPT                CE MLL ENT GPT                CE MLL ENT GPT
+            F1     0.821 0.832               F1    0.890 0.891 0.885 0.776       0.873 0.882 0.885 0.654       0.861 0.865 0.869 0.527       0.836 0.848 0.845 0.389
+                                    SNLI
+                   (0.00) (0.00)                   (0.02) (0.02) (0.30) (0.00)   (0.00) (0.09) (0.04) (0.00)   (0.00) (0.04) (0.01) (0.01)   (0.00) (0.04) (0.01) (0.01)
+            MSE 0.264 0.257                  MAE   0.123 0.122 0.128 0.261       0.146 0.131 0.129 0.424       0.161 0.153 0.150 0.599       0.191 0.171 0.181 0.811
+                   (0.00) (0.01)                   (0.01) (0.02) (0.00) (0.00)   (0.00) (0.01) (0.00) (0.00)   (0.00) (0.01) (0.00) (0.02)   (0.00) (0.05) (0.00) (0.01)
+            MAE 0.208 0.205                  MSE   0.152 0.149 0.157 0.338       0.188 0.156 0.159 0.596       0.206 0.190 0.190 0.878       0.249 0.210 0.236 1.263
+    SNLI           (0.02) (0.01)                   (0.04) (0.04) (0.01) (0.00)   (0.00) (0.05) (0.00) (0.00)   (0.00) (0.00) (0.00) (0.04)   (0.01) (0.06) (0.00) (0.04)
+            OB1    0.972 0.974               OB1   0.985 0.986 0.985 0.961       0.979 0.987 0.980 0.913       0.977 0.981 0.980 0.860       0.971 0.980 0.972 0.774
+                   (0.01) (0.00)                   (0.01) (0.01) (0.02) (0.00)   (0.00) (0.02) (0.00) (0.00)   (0.00) (0.02) (0.00) (0.01)   (0.00) (0.00) (0.00) (0.01)
+            F1     0.357 0.378               F1    0.484 0.492 0.508 0.487       0.442 0.468 0.46 0.476        0.415 0.440 0.423 0.316       0.417 0.428 0.430 0.274
+                                    SST5
+                   (0.01) (0.02)                   (0.01) (0.01) (0.01) (0.02)   (0.02) (0.03) (0.02) (0.00)   (0.03) (0.04) (0.03) (0.01)   (0.02) (0.08) (0.03) (0.02)
+            MSE 1.197 1.125                  MAE   0.576 0.575 0.543 0.585       0.620 0.600 0.585 0.595       0.652 0.620 0.619 0.966       0.697 0.662 0.651 1.043
+                   (0.00) (0.01)                   (0.02) (0.02) (0.01) (0.01)   (0.01) (0.02) (0.01) (0.00)   (0.04) (0.04) (0.04) (0.03)   (0.02) (0.10) (0.01) (0.02)
+            MAE 0.768 0.742                  MSE   0.761 0.757 0.683 0.802       0.845 0.760 0.694 0.819       0.910 0.827 0.870 1.740        1.04 0.905 0.871 1.897
+    SST5           (0.02) (0.01)                   (0.04) (0.01) (0.02) (0.02)   (0.04) (0.04) (0.04) (0.01)   (0.10) (0.12) (0.01) (0.10)   (0.06) (0.25) (0.01) (0.19)
+            OB1    0.852 0.863               OB1   0.925 0.931 0.932 0.918       0.910 0.929 0.93 0.912        0.902 0.918 0.911 0.769       0.875 0.898 0.915 0.734
+                   (0.00) (0.00)                   (0.01) (0.00) (0.01) (0.00)   (0.08) (0.01) (0.01) (0.00)   (0.01) (0.02) (0.02) (0.01)   (0.01) (0.05) (0.02) (0.01)
+            F1     0.543 0.544               F1    0.586 0.589 0.585 0.522       0.573 0.579 0.586 0.449       0.563 0.572 0.573 0.402       0.534 0.553 0.544 0.389
+                   (0.02) (0.00)                   (0.04) (0.04) (0.03) (0.00)   (0.00) (0.01) (0.02) (0.01)   (0.00) (0.02) (0.01) (0.00)   (0.01) (0.03) (0.01) (0.00)
+            MSE 0.904 0.819                  MAE   0.485 0.476 0.483 0.573       0.505 0.497 0.480 0.678       0.520 0.503 0.502 0.773        0.56 0.528 0.541 0.813
+                   (0.04) (0.01)                   (0.06) (0.06) (0.01) (0.01)   (0.00) (0.01) (0.00) (0.00)   (0.00) (0.07) (0.02) (0.00)   (0.01) (0.05) (0.02) (0.00)
+    Amazon  MAE 0.581 0.568        Amazon    MSE   0.675 0.634 0.664 0.848       0.707 0.683 0.655 1.085       0.739 0.698 0.689 1.348       0.835 0.708 0.767 1.475
+    Reviews        (0.01) (0.00)   Reviews         (0.01) (0.01) (0.02) (0.04)   (0.01) (0.03) (0.01) (0.01)   (0.02) (0.05) (0.02) (0.01)   (0.04) (0.06) (0.01) (0.01)
+            OB1    0.903 0.915               OB1   0.938 0.945 0.939 0.911       0.932 0.935 0.942 0.864       0.929 0.938 0.935 0.825       0.913 0.934 0.925 0.807
+                   (0.00) (0.00)                   (0.03) (0.03) (0.01) (0.00)   (0.00) (0.00) (0.00) (0.00)   (0.00) (0.03) (0.01) (0.00)   (0.00) (0.02) (0.01) (0.00)
+
+
+Table 4: CE vs MLL using Table 5: Comparison of techniques for all 3 datasets in full-data and few-shot settings (100,
+TinyBERT as base model. 50, 25, 10% of data) using BERT-base and GPT2-small as base models. We include one
+For full comparison refer representative loss from each approach - cross-entropy (CE) baseline (nominal), proposed
+Table 2.                  explicit ordinal loss (MLL) and implicit approaches - Entailment (ENT), Generative (GPT).
+
+
+achieves state-of-the-art performance, surpassing                                      However, as mentioned in §2, given that both the
+its larger predecessors like GPT-3 (175B) on the                                       losses and metrics are also from the PSR family,
+majority of benchmarks.                                                                and hence are not independent of each other, a big-
+   Note that our approach is different from                                            ger base model would improve both the nominal
+GPT2ForSquenceClassification1 where the last                                           and ordinal metrics simultaneously. Thus, in off-
+embedding of the last token is used for classifica-                                    line use cases where it is possible to deploy much
+tion, which is similar to encoder-model (like BERT)                                    bigger models, the difference in performance due
+style classification. Instead we train it for a lan-                                   to various losses is quite minimal. However, in
+guage modelling task to generate within a fixed set                                    online settings, where it is imperative to deploy
+of tokens i.e. the set of labels.                                                      lightweight models due to latency reasons, the dif-
+                                                                                       ference is quite pronounced.
+5       Results and Discussion                                                            When considering implicit approaches, we ob-
+                                                                                       serve that the Entailment (ENT) approach performs
+For the explicit loss-based approaches, the exper-
+                                                                                       on par with the MLL loss across all three datasets,
+imental results presented in Table 4 and 5 show
+                                                                                       without any explicit ordinality enforcing mechan-
+that our proposed hybrid MLL loss improves the
+                                                                                       ism. It even outperforms CE, MLL, and GPT in
+ordinal performance (as measured via MAE, MSE,
+                                                                                       almost all data settings for SST-5. This could
+OB1), compared to CE, without compromising
+                                                                                       be attributed to the fact that SST-5 has a signific-
+its performance along the nominal dimension (as
+                                                                                       antly lower number of samples (∼12k) compared to
+measured via weighted-F1). A detailed comparison
+                                                                                       SNLI and AR (∼200k). Thus, the ENT approach
+of the performance of MLL against other ordinal
+                                                                                       performs better in few-shot scenarios. Another
+loss functions is given in Table 3 where we further
+                                                                                       interesting observation is that for SNLI and AR,
+notice that MLL consistently achieves a balanced
+                                                                                       although the performances of ENT and MLL are
+performance on both ordinal and nominal metrics,
+                                                                                       similar, the standard deviation numbers are con-
+compared to other ordinal losses where nominal
+                                                                                       sistently lower in the case of ENT, making it a
+metrics degrade in general. But, compared to the
+                                                                                       reliable and relatively more stable approach to use
+results of TinyBERT in Table 2, the difference in
+                                                                                       in low-data settings. This supports our claimed hy-
+performances is less pronounced (Castagnos et al.,
+                                                                                       pothesis that the model is able to leverage natural
+2022). The observed phenomenon may be ex-
+                                                                                       language label descriptions to inherently enforce
+plained by the necessity for the smaller base mod-
+                                                                                       ordinality in its predictions.
+els to rely more on the explicit enforcement of or-
+dinal losses in enhancing performance in OC tasks.                                        To examine the impact of incorporating inform-
+                                                                                       ative verbalisers, we also fine-tuned using un-
+    1
+        https://tinyurl.com/am93sjdw                                                   informative ones, replacing the label descriptions
+                                                                                 5396
+                                                                1.0                                                                                                 1.2
+              1.0    ENT   ENT_U          GPT    GPT_U                 ENT   ENT_U          GPT    GPT_U           1.4    ENT   ENT_U          GPT    GPT_U                ENT   ENT_U          GPT    GPT_U
+                                                                0.8                                                1.2                                              1.0
+              0.8
+                                                                                                                   1.0
+                                                                0.6                                                                                                 0.8
+
+Weighted F1
+              0.6                                                                                                  0.8
+                                                          MAE                                                MSE                                              OB1
+                                                                0.4                                                0.6                                              0.6
+              0.4
+                                                                                                                   0.4                                              0.4
+              0.2                                               0.2
+                                                                                                                   0.2
+                                                                                                                                                                    0.2
+              0.0                                               0.0                                                0.0
+                    100%   50%           25%    10%                   100%   50%           25%    10%                    100%   50%           25%    10%                  100%   50%           25%    10%
+                                 SNLI                                              SNLI                                               SNLI                                             SNLI
+                                                               2.00                                                 7                                               1.2
+              1.0    ENT   ENT_U          GPT    GPT_U                 ENT   ENT_U          GPT    GPT_U                  ENT   ENT_U          GPT    GPT_U                ENT   ENT_U          GPT    GPT_U
+                                                               1.75                                                 6
+                                                                                                                                                                    1.0
+              0.8                                              1.50                                                 5
+                                                               1.25                                                                                                 0.8
+
+Weighted F1
+              0.6                                                                                                   4
+                                                         MAE   1.00                                           MSE                                             OB1
+                                                                                                                    3                                               0.6
+              0.4                                              0.75
+                                                               0.50                                                 2
+                                                                                                                                                                    0.4
+              0.2
+                                                               0.25                                                 1
+                                                                                                                                                                    0.2
+              0.0                                              0.00                                                 0
+                    100%   50%           25%    10%                   100%   50%           25%    10%                    100%   50%           25%    10%                  100%   50%           25%    10%
+                                 SST-5                                             SST-5                                              SST-5                                            SST-5
+                                                               2.00                                                3.0                                              1.2
+              1.0    ENT   ENT_U          GPT    GPT_U                 ENT   ENT_U          GPT    GPT_U                  ENT   ENT_U          GPT    GPT_U                ENT   ENT_U          GPT    GPT_U
+                                                               1.75
+                                                                                                                   2.5                                              1.0
+              0.8                                              1.50
+                                                                                                                   2.0
+                                                               1.25                                                                                                 0.8
+
+Weighted F1
+              0.6
+                                                         MAE   1.00                                          MSE   1.5                                        OB1
+                                                                                                                                                                    0.6
+              0.4                                              0.75
+                                                                                                                   1.0
+                                                               0.50                                                                                                 0.4
+              0.2                                                                                                  0.5
+                                                               0.25
+                                                                                                                                                                    0.2
+              0.0                                              0.00                                                0.0
+                    100%   50%        25%       10%                   100%   50%        25%       10%                    100%   50%        25%       10%                  100%   50%        25%       10%
+                           Amazon Reviews                                    Amazon Reviews                                     Amazon Reviews                                   Amazon Reviews
+
+
+Figure 3: Effect of informative vs uninformative prompts in Implicit approaches on the nominal (F1) and ordinal metrics (MAE,
+MSE, OB1) on SNLI (top), SST5 (middle) and Amazon Reviews (bottom) datasets. Results averaged across 5 random seeds.
+(Notation: _U refers to the un-informative verbaliser variant. Weighted-F1 and OB1: ↑ better, MAE and MSE: ↓ better.)
+
+
+with unrelated words such as "cat"/"lion"/"zebra".                                                            meters to the encoder counterpart used in ENT &
+Our observations, depicted in Figure 3, reveal in-                                                            Explicit loss approaches. Despite its usual under-
+triguing findings. When the training data volume is                                                           performance compared to MLL and ENT, which
+low, the effect of label semantics becomes clearly                                                            aligns with the general observation that GPT-2 typ-
+visible. In the SST-5 dataset (with training data                                                             ically fares worse than BERT-base on most clas-
+volume ∼10k), the influence of informative la-                                                                sification tasks (Neerudu et al., 2023), we demon-
+bels is evident across all settings (refer to middle                                                          strate its ability to recognize label order by contrast-
+section in Figure 3). Similarly, in the AR and SNLI                                                           ing informative versus un-informative verbalisers,
+datasets (with training data volume ∼250k), the im-                                                           akin to the ENT approach. Similar trends are ob-
+pact of informative labels is noticeable only in the                                                          served with the Entailment technique, particularly
+25% or 10% data settings (refer to top and bottom                                                             the significant failure of the un-informative verb-
+sections in Figure 3). In other cases, the distinc-                                                           aliser variant on the SST-5 dataset. Across other
+tion is less clear due to the sheer volume of train-                                                          datasets, performance in terms of F1-score is com-
+ing data; even un-informative labels yield decent                                                             parable to the informative variant, except for 10%
+performance, possibly leveraging some spurious                                                                case in SNLI and AR (low-data setting). Notably,
+correlations, thus rendering the semantics not so                                                             for ordinal metrics like MAE and MSE, we observe
+effective. This finding also aligns with the hypo-                                                            high variance in AR and SST-5 datasets (Figure 3),
+thesis proposed by Wang et al. (2021), indicating                                                             underscoring the importance of employing inform-
+that prompt-based models may not leverage label                                                               ative label verbalizers for stable learning. Two
+semantics as expected, with the dependency be-                                                                common findings emerge from the informative vs
+ing influenced by the model and dataset size to                                                               un-informative ablations in both ENT and GEN ex-
+some extent. On another note, for ENT approach,                                                               periments: (a) The hypothesis posited in (Webson
+the inference time is scaled by ∼O(K) (K: total                                                               and Pavlick, 2022) holds true for ordinal metrics
+labels). But with more carefully engineered verbal-                                                           as well as nominal metrics. (b) Label semantics
+isers, similar or even better performance could be                                                            become significant only in low-data settings.
+achieved even with smaller base models (Jin et al.,                                                              The purpose of presenting GPT-2 results was
+2022) making it a suitable candidate for ordinal                                                              to illustrate the true potential of generative ap-
+problems.                                                                                                     proaches, through LLMs, as introduced in §4.
+   In our generative (GEN) approach, we initially                                                             We leverage the Llama-Adapter technique (Zhang
+employed the GPT2-small model for experiments,                                                                et al., 2023) which introduces only 1.2M tunable
+as it has a comparable number of fine-tunable para-                                                           parameters over the base model by prepending a
+                                                                                                           5397
+set of learnable adaption verbalisers to the word                                              the first study to thoroughly examine and compare
+tokens at higher transformer layers and show that it                                           these approaches from both theoretical and em-
+still outperforms all explicit & implicit approaches                                           pirical standpoints. Our analysis (summarized in
+presented above (refer Table 6). While we acknow-                                              Table 7) reveals that MLL demonstrates balanced
+ledge that the enhanced ordinal performance may                                                performance across ordinal and nominal metrics,
+be attributed to the increased classification perform-                                         unlike existing explicit losses. However, in few-
+ance resulting from larger model size, we refer to                                             shot scenarios, ENT is preferred for its ability to
+Table 6 to demonstrate that even with larger base                                              achieve optimal performance with fewer examples,
+models, the distinction between informative and un-                                            leveraging label semantics. Furthermore, we high-
+informative verbalisers persists. This underscores                                             light the importance of providing informative verb-
+the model’s ability to recognize label order. In Fig-                                          alisers in low-data settings, resulting in reduced
+ure 4 we show the % of samples which follow the                                                variance and improved outcomes. However, the dis-
+unimodality (UM) property empirically. Although                                                tinction between strategies becomes less clear with
+there is no theoretical guarantee for both our pro-                                            increasing data. In full-data scenarios, fine-tuning
+posed explicit & implicit strategies, we observe                                               Llama-7B-Adapter surpasses previous approaches
+∼ 95%+ samples satisfy this property which justi-                                              due to its substantial model size. Interestingly, even
+fies the increased ordinal performance of the above                                            with such a large base model, the impact of adding
+discussed approaches.                                                                          informative verbalisers remains apparent, indicat-
+                                                                                               ing its recognition of label order. We hope that
+                      SST                          AR                         SNLI
+                I              U             I             U              I          U         our work will serve as a benchmark encompassing
+            60.845           58.55        62.71           62.4         90.19       89.08
+    F1
+             (0.16)          (0.22)       (0.02)         (0.1)         (0.15)      (0.39)      multitude of approaches, providing a foundation
+            0.4066                       0.4139                       0.1068
+    MAE
+            (0.003)
+                            0.4327
+                            (0.008)      (0.001)
+                                                        0.4186
+                                                        (0.003)       (0.001)
+                                                                                  0.1188
+                                                                                  (0.004)      for future efforts to address OC in NLP.
+            0.4538          0.4918       0.5087         0.5182        0.1241      0.1366
+    MSE
+            (0.007)          (0.01)      (0.005)        (0.008)       (0.001)     (0.013)
+            0.9786                        0.963                       0.9913
+    OB1
+            (0.001)
+                            0.9750
+                            (0.003)      (0.001)
+                                                        0.9595
+                                                        (0.003)       (0.001)
+                                                                                  0.9911
+                                                                                  (0.002)      7   Limitations
+Table 6: Effect of informative (I) vs un-informative (U) verb-                                 In this study, we don’t consider the effect of prob-
+alisers on Llama-7B
+                                                                                               ability calibration techniques on the explicit ap-
+                                                                                               proaches (Kull et al., 2019), as the techniques em-
+                                                                                               ployed are largely identical to those used in nom-
+                            Amazon Reviews                                                     inal classification, offering no distinct or novel
+                                                                                               methodologies specifically for OC tasks. Also
+                                                                      1.0
+                                                               0.95                            for implicit approaches, a more deeper analysis
+                                                         0.9
+                                                                        SST                    is required on how implicit methods like LLMs &
+                                                                                               PLMs implicitly capture ordinality. It’s not always
+               GPT-2
+               Entailment
+                                                                                               analogous to how humans use task instructions as
+               MLL
+               CE                                                                              shown in Webson and Pavlick (2022). Furthermore,
+                                  SNLI
+                                                                                               in this study we limit ourselves to only finetuning-
+           Figure 4: % samples following UM property.                                          based OC approaches. However, it would also be
+                                                                                               interesting to explore OC through the lens of in-
+                                                                                               context learning (ICL) for generative approaches.
+                                                                                               Also for the generative approach, we make the as-
+     Technique                       Recommended Setting                                       sumption that the label word will not break further
+       MLL                    high-data regime, high % unimodality
+       ENT                  low-data regime, inference time ∼ O(K)
+                                                                                               into multiple tokens by re-mapping original labels
+       LLM                    high-data regime, compute-intensive,                             to simpler words (see Appendix 9). This avoids
+                                 hallucinates in low-data setting                              having to account for multiple token probabilities
+    Table 7: Recommended techniques for various settings
+                                                                                               when taking the argmax. Without this some sort of
+                                                                                               normalization would be required across the entire
+                                                                                               generation length to compare different outputs. We
+6         Conclusion                                                                           leave these discussions for future work. Although
+                                                                                               we observe that LLMs such as Llama-7B outper-
+This paper presents an unified analysis of expli-                                              form all other models in full-data settings, they
+cit and implicit strategies for addressing OC. It is                                           pose challenges in terms of compute resources and
+                                                                                            5398
+inference time. Additionally, fine-tuning Llama-7B          Jordi de la Torre, Domenec Puig, and Aida Valls. 2017.
+is susceptible to hallucinations in low-data settings         Weighted kappa loss function for multi-class clas-
+                                                               sification of ordinal data in deep learning. Pattern
+(Zhao et al., 2021), which is why we do not report
+                                                               Recognition Letters.
+LLM results for the few-shot case. Furthermore,
+the possibility that some of these popular bench-           Jacob Devlin, Ming-Wei Chang, Kenton Lee, and
+mark datasets might have been used for pretraining             Kristina Toutanova. 2019. BERT: Pre-training of
+recent LLMs is an important consideration, not                 deep bidirectional transformers for language under-
+                                                               standing. In Proceedings of the 2019 Conference of
+just for this work but for all empirical research              the North American Chapter of the Association for
+involving LLMs. Hence, further research on this               Computational Linguistics: Human Language Tech-
+issue is warranted.                                            nologies, Volume 1 (Long and Short Papers), pages
+                                                              4171–4186, Minneapolis, Minnesota. Association for
+                                                               Computational Linguistics.
+References
+                                                            Simon Du, Jason Lee, Haochuan Li, Liwei Wang, and
+Christopher Beckham and Christopher Pal. 2017. Un-            Xiyu Zhai. 2019. Gradient descent finds global min-
+  imodal probability distributions for deep ordinal clas-     ima of deep neural networks. In International confer-
+  sification. In International Conference on Machine          ence on machine learning, pages 1675–1685. PMLR.
+  Learning, pages 411–419. PMLR.
+Samuel R. Bowman, Gabor Angeli, Christopher Potts,          Raúl Díaz and Amit Marathe. 2019. Soft labels for
+  and Christopher D. Manning. 2015. A large annot-            ordinal regression. In 2019 IEEE/CVF Conference
+  ated corpus for learning natural language inference.        on Computer Vision and Pattern Recognition (CVPR),
+  In Proceedings of the 2015 Conference on Empir-             pages 4733–4742.
+  ical Methods in Natural Language Processing, pages
+  632–642, Lisbon, Portugal. Association for Compu-         Tilmann Gneiting and Adrian E Raftery. 2007. Strictly
+  tational Linguistics.                                        proper scoring rules, prediction, and estimation.
+                                                               Journal of the American statistical Association,
+Stephen P Boyd and Lieven Vandenberghe. 2004. Con-             102(477):359–378.
+   vex optimization. Cambridge university press.
+                                                            Maria Iannario and Domenico Piccolo. 2011. Cub mod-
+Tom Brown, Benjamin Mann, Nick Ryder, Melanie                 els: Statistical methods and empirical evidence. Mod-
+  Subbiah, Jared D Kaplan, Prafulla Dhariwal, Arvind          ern Analysis of Customer Surveys: with applications
+  Neelakantan, Pranav Shyam, Girish Sastry, Amanda            using R, pages 231–258.
+  Askell, Sandhini Agarwal, Ariel Herbert-Voss,
+  Gretchen Krueger, Tom Henighan, Rewon Child,
+  Aditya Ramesh, Daniel Ziegler, Jeffrey Wu, Clem-          Woojeong Jin, Yu Cheng, Yelong Shen, Weizhu Chen,
+  ens Winter, Chris Hesse, Mark Chen, Eric Sigler,           and Xiang Ren. 2022. A good prompt is worth
+  Mateusz Litwin, Scott Gray, Benjamin Chess, Jack           millions of parameters: Low-resource prompt-based
+  Clark, Christopher Berner, Sam McCandlish, Alec            learning for vision-language models. In Proceedings
+  Radford, Ilya Sutskever, and Dario Amodei. 2020.           of the 60th Annual Meeting of the Association for
+  Language models are few-shot learners. In Ad-              Computational Linguistics (Volume 1: Long Papers),
+  vances in Neural Information Processing Systems,           pages 2763–2775, Dublin, Ireland. Association for
+  volume 33, pages 1877–1901. Curran Associates,             Computational Linguistics.
+  Inc.
+                                                            Kenji Kawaguchi, Jiaoyang Huang, and Leslie Pack
+Wenzhi Cao, Vahid Mirjalili, and Sebastian Raschka.           Kaelbling. 2019. Every local minimum value is
+ 2020. Rank consistent ordinal regression for neural          the global minimum value of induced model in
+ networks with application to age estimation. Pattern         nonconvex machine learning. Neural Computation,
+ Recognition Letters, 140:325–331.                            31(12):2293–2323.
+François Castagnos, Martin Mihelich, and Charles            Phillip Keung, Yichao Lu, György Szarvas, and Noah A.
+  Dognin. 2022. A simple log-based loss function              Smith. 2020. The multilingual Amazon reviews cor-
+  for ordinal text classification. In Proceedings of the      pus. In Proceedings of the 2020 Conference on
+  29th International Conference on Computational Lin-         Empirical Methods in Natural Language Processing
+  guistics, pages 4604–4609.                                  (EMNLP), pages 4563–4568, Online. Association for
+Joaquim F Pinto da Costa, Hugo Alonso, and Jaime S            Computational Linguistics.
+  Cardoso. 2008. The unimodal model for the classific-
+  ation of ordinal data. Neural Networks, 21(1):78–91.      Meelis Kull, Miquel Perello Nieto, Markus Käng-
+                                                             sepp, Telmo Silva Filho, Hao Song, and Peter Flach.
+Nhan Cach Dang, María N Moreno-García, and                   2019. Beyond temperature scaling: Obtaining well-
+  Fernando De la Prieta. 2020. Sentiment analysis            calibrated multi-class probabilities with dirichlet cal-
+  based on deep learning: A comparative study. Elec-         ibration. In Advances in Neural Information Pro-
+  tronics, 9(3):483.                                         cessing Systems, volume 32. Curran Associates, Inc.
+                                                        5399
+Balaji Lakshminarayanan, Alexander Pritzel, and          Sinong Wang, Han Fang, Madian Khabsa, Hanzi Mao,
+  Charles Blundell. 2017. Simple and scalable pre-         and Hao Ma. 2021. Entailment as few-shot learner.
+  dictive uncertainty estimation using deep ensembles.
+  Advances in neural information processing systems,     Albert Webson and Ellie Pavlick. 2022. Do prompt-
+  30.                                                      based models really understand the meaning of their
+                                                           prompts? In Proceedings of the 2022 Conference of
+Zefang Liu. 2020. Yelp review rating prediction: Ma-       the North American Chapter of the Association for
+  chine learning and deep learning models.                 Computational Linguistics: Human Language Tech-
+                                                           nologies, pages 2300–2344, Seattle, United States.
+Quentin Mérigot, Filippo Santambrogio, and Clément         Association for Computational Linguistics.
+  Sarrazin. 2021. Non-asymptotic convergence bounds
+  for wasserstein approximation using point clouds.      Stephan Wojtowytsch. 2023. Stochastic gradient des-
+  Advances in Neural Information Processing Systems,        cent with noise of machine learning type part i: Dis-
+  34:12810–12821.                                           crete time analysis. Journal of Nonlinear Science,
+                                                            33(3):45.
+Edgar C Merkle and Mark Steyvers. 2013. Choosing
+  a strictly proper scoring rule. Decision Analysis,     Ryoya Yamasaki. 2022. Unimodal likelihood models
+  10(4):292–304.                                           for ordinal data. Transactions on Machine Learning
+                                                           Research.
+Pavan Kalyan Reddy Neerudu, Subba Reddy Oota,
+  Mounika Marreddy, Venkateswara Rao Kagita, and         Renrui Zhang, Jiaming Han, Aojun Zhou, Xiangfei Hu,
+  Manish Gupta. 2023. On robustness of finetuned           Shilin Yan, Pan Lu, Hongsheng Li, Peng Gao, and
+  transformer-based nlp models.   arXiv preprint           Yu Qiao. 2023. Llama-adapter: Efficient fine-tuning
+  arXiv:2305.14453.                                        of language models with zero-init attention. arXiv
+Mert Pilanci and Tolga Ergen. 2020. Neural net-            preprint arXiv:2303.16199.
+ works are convex regularizers: Exact polynomial-        Zihao Zhao, Eric Wallace, Shi Feng, Dan Klein, and
+ time convex optimization formulations for two-layer       Sameer Singh. 2021. Calibrate before use: Improv-
+ networks. In International Conference on Machine          ing few-shot performance of language models. In
+ Learning, pages 7695–7705. PMLR.                          Proceedings of the 38th International Conference
+Alec Radford, Karthik Narasimhan, Tim Salimans, and        on Machine Learning, volume 139 of Proceedings
+  Ilya Sutskever. 2018a. Improving language under-         of Machine Learning Research, pages 12697–12706.
+  standing by generative pre-training. OpenAI.             PMLR.
+
+Alec Radford, Jeffrey Wu, Rewon Child, David Luan,
+  Dario Amodei, and Ilya Sutskever. 2018b. Language
+  models are unsupervised multitask learners.
+Yossi Rubner, Carlo Tomasi, and Leonidas J Guibas.
+  2000. The earth mover’s distance as a metric for
+  image retrieval. International journal of computer
+  vision, 40(2):99.
+Héctor A Sánchez-Hevia, Roberto Gil-Pita, Manuel
+  Utrilla-Manso, and Manuel Rosa-Zurera. 2022. Age
+  group classification and gender recognition from
+  speech with temporal convolutional neural networks.
+  Multimedia Tools and Applications, 81(3):3535–
+  3552.
+Richard Socher, Alex Perelygin, Jean Wu, Jason
+  Chuang, Christopher D. Manning, Andrew Ng, and
+  Christopher Potts. 2013. Recursive deep models for
+  semantic compositionality over a sentiment treebank.
+  In Proceedings of the 2013 Conference on Empir-
+  ical Methods in Natural Language Processing, pages
+  1631–1642, Seattle, Washington, USA. Association
+  for Computational Linguistics.
+Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier
+  Martinet, Marie-Anne Lachaux, Timothée Lacroix,
+  Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal
+  Azhar, Aurelien Rodriguez, Armand Joulin, Edou-
+  ard Grave, and Guillaume Lample. 2023. Llama:
+  Open and efficient foundation language models. Cite
+  arxiv:2302.13971.
+                                                     5400
+A    Datasets                                           and positive, providing nuanced insights into the
+                                                        sentiment expressed within the sentences.
+A.1 SNLI
+The dataset utilised in this study, initially intro-    Furthermore, for the few-shot learning scen-
+duced by Bowman et al. (2015) comprises a sub-          ario, we selected subsets consisting of 10%, 25%,
+stantial collection of 570,000 pairs of human-          and 50% of the data in a randomised manner. This
+authored English sentences. This dataset has a CC       random selection process was repeated for multiple
+BY-SA 4.0 license. To ensure robustness, 10,000         seed values, and the average results were reported
+pairs have been set aside for both testing and val-     to mitigate potential variations.
+idation purposes. Within this corpus, the labels
+assigned to each sentence pair are evenly distrib-      B     Metrics
+uted among three distinct categories: entailment,
+                                                        B.1     Nominal Metrics
+neutral, and contradiction. In order to maintain con-
+sistent data sizes across all datasets and expedite     B.1.1    F-1 Score
+the training process, a subset of 250,000 pairs was     The F1 score is a popular metric for evaluating clas-
+randomly sampled from the entire collection.            sification models. It combines precision and recall
+                                                        to provide a single value that represents the model’s
+A.2 Amazon Reviews
+                                                        overall performance. A good F1 score indicates the
+The dataset utilised in this study, originally intro-   model’s effectiveness in correctly classifying data
+duced by Keung et al. (2020), was constructed by        points.
+extracting customer reviews from a diverse range
+of product categories found on the Amazon mar-                                 precision × recall
+                                                                    F1 = 2 ×
+ketplace. While reviews were collected in six dif-                             precision + recall
+ferent languages, only those composed in English
+                                                        B.2     Ordinal Metrics
+were retained for training purposes. The dataset
+is structured for classification tasks and includes     B.2.1    MSE
+the corresponding star ratings, represented as in-      Mean Squared Error (MSE), quantifies the average
+tegers spanning from 1 to 5. With a total of 210,000    squared difference between the predicted values
+samples, 5,000 samples were allocated separately        and the corresponding actual values. A lower MSE
+for testing and validation purposes. Unlike the         signifies a superior alignment between the model’s
+SNLI dataset, which underwent a sampling pro-           predictions and the ground truth values, thereby
+cess, the entire dataset was utilised for training in   indicating heightened accuracy.
+this particular study.                                                          1X
+                                                                                  n
+                                                                      MSE =         (yi − yˆi )2
+A.3 SST5                                                                        n
+                                                                                  i=1
+
+The Stanford Sentiment Treebank (SST), originally       B.2.2    MAE
+introduced by Socher et al. (2013), serves as a
+                                                        Mean Absolute Error (MAE), calculates the av-
+dedicated corpus tailored specifically for sentiment
+                                                        erage absolute difference between the predicted
+analysis tasks. This dataset comes with a CC0
+                                                        values and the corresponding actual values. MAE
+(public domain) license. What sets this corpus
+                                                        offers a straightforward interpretation, representing
+apart is its incorporation of parse trees, which
+                                                        the average magnitude of errors. A lower MAE
+enable comprehensive sentiment analysis at
+                                                        value signifies a more accurate alignment between
+a granular level. The SST corpus consists of
+                                                        the model’s predictions and the ground truth values,
+a meticulously curated collection of 12,000
+                                                        indicating a superior fit.
+sentences extracted from movie reviews, with                                        n
+each sentence undergoing thorough annotation                                    1X
+                                                                       MAE =          |yi − yˆi |
+by three human annotators. In the fine-grained                                  n
+                                                                                  i=1
+variant of SST, known as SST-5, every individual
+phrase within the sentences is assigned a rating        B.3     Off-by-k Accuracy
+on a five-star scale. These ratings correspond to       Off-by-k accuracy is a metric used to evaluate the
+distinct sentiment categories, including negative,      performance of a prediction model, particularly in
+somewhat negative, neutral, somewhat positive,          the context of ranking or recommendation systems.
+                                                    5401
+It measures the percentage of predictions that are      tioning the label verbaliser at the end of the text seg-
+within k positions of the correct prediction.           ment demonstrated the best results. The input is in
+                         S                              the format - text [SEP] verbaliser(label) for
+                     1X
+     OBk = 100 ×            1{d(ys , ŷs ) ≤ k}         1-sentence tasks and premise [SEP] hypothesis
+                     S
+                        s=1                             [SEP] verbaliser(label) for 2-sentence task.
+                                                        For verbaliser() details refer to Table 8 and 9.
+C    Implementation Details                                For un-informative verbalisers, we used
+                                                        "cat"/"lion"/"zebra"/"dog"/"snake" for SST-5, AR
+We employed the BERT-base-uncased model as the          and "cat"/"lion"/"zebra" for SNLI.
+backbone for our vanilla CE, MLL, and entailment           We also conducted additional experiments us-
+experiments. It consists of a total of 110M paramet-    ing the TinyBERT model as the backbone to com-
+ers including 12 encoder stacks, 12 attention heads,    pare various loss functions. The TinyBERT model
+and a hidden state dimension of 768. This model         has a smaller number of 14.5M parameters and
+was trained on lower-cased English text. To enable      is more sensitive to hyperparameters. We trained
+classification, we added a linear layer on top of the   this model using the same setup as the BERT-base-
+backbone model.                                         uncased experiments. The only difference was that
+   For the generative model experiments, we util-       we explored different variants of the OLL, MLL,
+ized GPT2-small as the backbone model, which            and SOFT loss functions by tuning hyperparamet-
+comprises 117M parameters, including 12 decoder         ers to compare them with other available loss func-
+stacks, 12 attention heads, and a hidden state di-      tions such as CE, EMD, CORAL, etc.
+mension size of 768. We choose the small variant           For the Llama-Adapter based experiments, we
+to ensure fair comparison with its encoder-model        keep the number of adapter layers at 30, the adap-
+counterpart.                                            tion verbaliser length at 10, max sequence length
+   For all the explicit loss-based experiments, we      512 to accommodate the instructions + verbaliser,
+followed the standard supervised learning setup         batch size 4, weight decay 0.02, base learning rate
+with the necessary modifications to loss function.      9e-3, warmup steps 2 and train it for 5 epochs. The
+For the Amazon Reviews (AR), and SST-5 datasets,        instruction-verbaliser template is kept the same as
+the input to the model was the text/review and the      Alpaca2 format.
+corresponding class label was provided in a one-hot        All experiments were conducted with 5 different
+encoded format. For the SNLI dataset, we passed         seeds on 8 Nvidia A100 GPUs in parallel. The
+the input as Premise [SEP] Hypothesis.                  reported results include the mean and standard de-
+   For the entailment experiments, as mentioned         viations. The CE and MLL experiments took ∼2
+in §3, we included one positive example and (K-         hours for AR, and SNLI, while SST-5 required ∼1
+1) negative examples. To address data imbalance,        hour. In comparison, the entailment experiments
+for AR, and SST-5, where there are five classes,        took 3-5x longer to train since the dataset size was
+we augmented an additional positive sample by           effectively increased by adding more negative &
+randomly deleting 5% of the text span in the in-        positive samples. The generative model experi-
+put text. For SNLI, we created two negative ex-         ments, took ∼1 hour for AR, and SNLI datasets
+amples corresponding to each positive sample. For       with max sequence length 128, and ∼30 mins for
+all four datasets, we trained for 5 epochs using a      SST-5. All the reported training times are based on
+learning rate of 5e-5, max sequence length 128,         the full-data setting.
+and batch size 32. Through experimentation, we
+determined the reported settings to yield the best      D       PSR proofs
+results. Here, the input format to the model was -
+                                                        For a function to be proper scoring rule, it should
+verbaliser(label) [SEP] text for 1-sentence
+                                                        attain its minimum value at the ground truth. For
+tasks like AR, and SST-5. For 2-sentence task
+                                                        some losses, like CE and EMD, which are standard
+like SNLI, the input format was - premise [SEP]
+                                                        losses in ML/NLP, it is well established that they
+verbaliser(label) [SEP] hypothesis.
+                                                        are satisfy by PSR. For others, we verify this prop-
+   For the generative model experiments, as men-
+                                                        erty analytically by checking if loss goes to zero
+tioned in §4, we trained GPT2 on the language
+                                                        when we pass the ground truth information directly.
+modeling task for 7 epochs using learning rate 1e-5,
+max sequence length 128, and batch size 32. Posi-           2
+                                                                https://github.com/tloen/alpaca-lora
+
+                                                    5402
+                  Dataset                                    Label Verbaliser
+                  SST-5       indicates {very negative / negative / neutral / positive / very positive} sentiment
+                  AR             given {very negative / negative / neutral / positive / very positive} review
+                  SNLI                        implies {entailment / neutral / contradiction} to
+
+Table 8: Verbalisers used for Entailment-style approach. The texts inside {} show all the possible label descriptions available to
+construct the verbaliser.
+
+                                       Dataset               Label Verbaliser
+                                       SST-5       worse / bad / neutral / good / excellent
+                                       AR          worse / bad / neutral / good / excellent
+                                       SNLI                     yes / fair / no
+
+                                      Table 9: Verbalisers used for Generative approach.
+
+
+Except for SOFT and VS-SL rest all other losses                     expected agreement by chance, and wij represents
+shown in Table 1 satisfy this PSR property. Below                   the weight assigned to each class pair.
+we give the overall idea on how to check for PSR                      To define the Weighted Kappa Loss function,
+condition.                                                          we can formulate it as the negative value of the
+  Cross-Entropy (CE): It is well established that                   weighted kappa coefficient:
+CE belongs to PSR family (Gneiting and Raftery,                                       Lweighted_kappa = −κ.                  (11)
+2007).                                                                 If our classifier correctly predicts the ground
+                                                                    truth our loss becomes zero, which guarantees that
+Ordinal Log Loss (OLL): OLL also belongs to                         WKL is a PSR.
+the PSR family since the ground-truth one-hot
+encoding vector minimizes the loss.                                 E     Convexity proofs
+                                                                    Most of the proofs are one-liners when we employ
+Multi-task log loss function (MLL): Since MLL
+                                                                    the standard results of convex optimization. We
+is a weighted sum of CE and OLL, it can be said
+                                                                    refer to Boyd and Vandenberghe (2004) for these
+that the ground-truth one-hot encoding vector
+                                                                    standard results.
+minimizes the MLL loss too since it is already
+                                                                       Ordinal Log Loss (OLL): OLL is given by
+established that both CE and OLL follow this
+                                                                            XN   X
+property.
+                                                                         −            |ik − yi |α log(1 − p̂ik ). (12)
+                                                                             i=1 K:ik ̸=yi
+SOFT labels (SOFT): The SOFT loss is similar
+                                                                       We will use the double derivative approach to
+to CE, computed with the soft ground labels due
+                                                                    prove the convexity. If we can prove the OLL to
+to which, the one hot encoded ground truth fails
+                                                                    be convex for any one arbitrary i, then the whole
+to minimise the loss. Hence SOFT loss doesn’t
+                                                                    function would also be convex(summation of con-
+belong to the PSR family.
+                                                                    vex functions is convex), so for an arbitrary i OLL
+Earth Mover Distance (EMD) : The EMD loss for                       is given by :
+one particular arbitrary i will be -
+                                                                                    X
+                                                                               −             |ik − yi |α log(1 − p̂ik ).     (13)
+         EMD = (CDF(I(yi )) − CDF(p̂i ))2                                       K:ik ̸=yi
+When the predicted probabilities p̂i coincide with                      The |ik − yi |α term is a positive constant with
+the one hot encoded ground truth I(yi ), loss value                 respect to pik , so it won’t affect the sign of double
+will be zero. Hence EMD does belong to the PSR                      derivative and hence can be ignored for easier com-
+family.                                                             putations. We now need to check the convexity of
+Weighted Kappa Loss (WKL): The loss is defined                      just :
+as -                                                                                    X
+                      P                                                            −          log(1 − p̂ik ).         (14)
+                        i,j wij Oij
+              κ=1− P                           (10)                                     K:ik ̸=yi
+                        i,j wij Eij                                   To prove the convexity of the given function, we
+  where Oij is the observed agreement between                       will use the second derivative approach and try to
+the annotators for class i and class j, Eij is the                  prove that Hessian wrt {pik } terms is positive semi-
+                                                              5403
+definite (PSD) everywhere on the domain [0, 1]K−1
+. For OLL, the Hessian will contain only diagonal
+terms and if we prove that each of these diagonal
+terms are positive, then we can say that Hessian is
+PSD and hence, OLL is convex. The diagonal term
+corresponding to pik is (1−p1i )2 which is always
+                              k
+non-negative.
+   MLL: MLL can be viewed as a sum of two func-
+tions on the K-dimensional simplex [0, 1]K−1 i.e.
+                              X
+            OLL − log(1 −               p̂ik )   (15)
+                            K:ik ̸=yi
+   Previously, we have seen that OLL is convex by
+proving the Hessian is PSD.P  Now, we also prove
+that the Hessian of − log(1− K:ik ̸=yi p̂ik ) is PSD
+on [0, 1]K−1 and hence, by the property that sum
+of two convex functions on the same domain is
+convex, we can say MLL is also convex.
+PIt is easy to verify Hessian       of − log(1 −
+            p̂i ) is       P 1          I
+   K:ik ̸=yi k          (1−       p̂i )2 K−1×K−1
+                            K:ik ̸=yi    k
+where IK−1×K−1 is an identity matrix of dimen-
+sion K − 1 × K − 1. For the Hessian to be
+PSD, all diagonal values must be non-negative
+and it’s true
+           P in this case. Hence the function
+− log(1 − K:ik ̸=yi p̂ik ) is convex along with the
+OLL being convex in the same domain, which
+makes MLL a convex loss function.
+   SOFT labels (SOFT):
+   The SOFT loss is given by :
+               N
+               XX
+             −         psoft
+                         ik′ log(p̂ik′ )       (16)
+                i=1 k′
+  where -
+
+                     exp(−β|ik − yi |)
+         psoft
+          ik = P                                (17)
+                     k′ exp(−β|ik′ − yi |)
+   The loss function bears resemblance to the Cross-
+Entropy (CE) loss, with the distinction that the
+ground truth one-hot encoded label is replaced by
+softlabels. The term psoft
+                       ik represents a positive con-
+stant concerning the differentiating variable and
+does not affect the sign of the double derivative.
+The convexity of the remaining function can be
+demonstrated in a similar manner as the CE loss.
+Alternatively, the convex nature of CE implies the
+convexity of the SOFT loss, and the convexity of
+CE has been previously established.
+   Earth Mover Distance (EMD) EMD is also
+known as Wassertein distance and is well known
+to be a convex loss on the probabilities (Mérigot
+et al., 2021).
+
+                                                    5404
+
